@@ -412,7 +412,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
   });
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
       {/* Header Bar */}
       <div className="p-4 border-b border-gray-200 bg-gray-50/80 flex flex-wrap justify-between items-center gap-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -506,10 +506,10 @@ export const JobManagement: React.FC<JobManagementProps> = ({
         </div>
       </div>
 
-      {/* Main Table */}
-      <div className="overflow-x-auto">
+      {/* Main Table Container with smooth vertical and horizontal scrolling */}
+      <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)] rounded-b-2xl">
         <table className="w-full text-left border-collapse">
-          <thead className="bg-gray-100/70 text-[11px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-200">
+          <thead className="bg-gray-100/95 backdrop-blur-xs text-[11px] text-gray-600 font-bold uppercase tracking-wider border-b border-gray-200 sticky top-0 z-10 shadow-2xs">
             <tr>
               <th className="p-3 text-center w-10">#</th>
               <th className="p-3 w-36">วันที่ / ช่วงเวลา</th>
@@ -603,6 +603,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
                       min={0}
                       step={job.type === 'install_wall_linen' || job.type === 'install_wall_mural' ? "0.1" : "1"}
                       value={job.rails}
+                      onWheel={e => e.currentTarget.blur()}
                       onChange={e => {
                         const raw = parseFloat(e.target.value);
                         if (isNaN(raw)) {

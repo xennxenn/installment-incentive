@@ -113,70 +113,75 @@ export const Reports: React.FC<ReportsProps> = ({
           <div>
             {selectedTeamId && calcData?.reportTeamLogs?.[selectedTeamId] ? (
               <div>
-                {/* Formal Corporate Header Block */}
-                <div className="border-b-2 border-gray-900 pb-4 mb-6">
-                  <div className="flex flex-wrap justify-between items-start gap-4">
-                    <div className="flex items-start gap-3">
-                      <img src={LOGO_URL} alt="PASAYA" className="h-[58px] w-auto object-contain flex-shrink-0" />
-                      <div className="text-xs text-gray-900 space-y-0.5">
-                        <h2 className="font-extrabold text-sm text-gray-900 tracking-tight leading-tight">
-                          บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
-                        </h2>
-                        <p className="text-[11px] text-gray-800 font-medium leading-tight whitespace-nowrap">
-                          77/191-192 อาคารสินสาธรทาวเวอร์ ชั้น 42 ถนนกรุงธนบุรี แขวงคลองต้นไทร เขตคลองสาน กรุงเทพฯ 10600 (สํานักงานใหญ่)
-                        </p>
-                        <p className="text-[11px] text-gray-800 font-medium leading-tight whitespace-nowrap">
-                          เลขประจําตัวผู้เสียภาษี 0105546015615 โทร: 0-2440-0955 แฟ็กซ์: 0-2440-0933-4
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right text-[11px]">
-                      <div className="inline-block border border-gray-300 rounded-lg p-2 bg-white text-left shadow-2xs">
-                        <div><strong className="text-gray-900">เลขที่เอกสาร:</strong> INC-TM-{(period?.id || '2026').replace(/[^a-zA-Z0-9]/g, '')}-{selectedTeamId}</div>
-                        <div><strong className="text-gray-900">วันที่ออกเอกสาร:</strong> {issueDateStr}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-center mt-5">
-                    <h1 className="font-black text-base md:text-lg text-gray-900 tracking-tight">
-                      เอกสารใบแจ้งรายละเอียดสวัสดิการค่าตอบแทนพิเศษ (สรุปรายทีม)
-                    </h1>
-                    <p className="text-xs font-semibold text-gray-700 mt-1">
-                      ประจำรอบการคำนวณ: <span className="text-gray-900 font-bold">{period?.name || ''}</span> ({formatDateTH(period?.start || '')} ถึง {formatDateTH(period?.end || '')})
-                    </p>
-                  </div>
-                </div>
-
-                {/* Team Info Metrics Header */}
-                <div className="grid grid-cols-3 gap-3 mb-6 p-3 bg-white border border-gray-300 rounded-xl text-xs">
-                  <div>
-                    <span className="text-gray-600 block">ทีมช่างปฏิบัติงาน:</span>
-                    <strong className="text-sm text-gray-900 font-bold">{calcData.reportTeamLogs[selectedTeamId]?.name || ''}</strong>
-                  </div>
-                  <div>
-                    <span className="text-gray-600 block">จำนวนรายการงานทั้งหมด:</span>
-                    <strong className="text-sm text-gray-900 font-bold">
-                      {calcData.reportTeamLogs[selectedTeamId].rows.filter(r => !r.isHoliday).length} รายการ
-                    </strong>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-gray-600 block">ยอดรวม Incentive ทีมสุทธิ:</span>
-                    <strong className="text-base text-emerald-800 font-black">
-                      ฿{Math.round(
-                        calcData.reportTeamLogs[selectedTeamId].rows.reduce(
-                          (sum, r) => sum + (typeof r.inc === 'number' ? r.inc : 0),
-                          0
-                        )
-                      ).toLocaleString()}
-                    </strong>
-                  </div>
-                </div>
-
                 {/* Formal Table */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse border border-gray-300">
                     <thead>
+                      {/* Formal Corporate Header Block & Metrics Header (Repeats on every printed page) */}
+                      <tr className="print-header-row">
+                        <td colSpan={10} className="print-header-cell border-none p-0 pb-4">
+                          <div className="border-b-2 border-gray-900 pb-4 mb-4">
+                            <div className="flex flex-wrap justify-between items-start gap-4">
+                              <div className="flex items-start gap-3">
+                                <img src={LOGO_URL} alt="PASAYA" className="h-[58px] w-auto object-contain flex-shrink-0" />
+                                <div className="text-xs text-gray-900 space-y-0.5">
+                                  <h2 className="font-extrabold text-sm text-gray-900 tracking-tight leading-tight">
+                                    บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
+                                  </h2>
+                                  <p className="text-[11px] text-gray-800 font-medium leading-tight whitespace-nowrap">
+                                    77/191-192 อาคารสินสาธรทาวเวอร์ ชั้น 42 ถนนกรุงธนบุรี แขวงคลองต้นไทร เขตคลองสาน กรุงเทพฯ 10600 (สํานักงานใหญ่)
+                                  </p>
+                                  <p className="text-[11px] text-gray-800 font-medium leading-tight whitespace-nowrap">
+                                    เลขประจําตัวผู้เสียภาษี 0105546015615 โทร: 0-2440-0955 แฟ็กซ์: 0-2440-0933-4
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right text-[11px]">
+                                <div className="inline-block border border-gray-300 rounded-lg p-2 bg-white text-left shadow-2xs">
+                                  <div><strong className="text-gray-900">เลขที่เอกสาร:</strong> INC-TM-{(period?.id || '2026').replace(/[^a-zA-Z0-9]/g, '')}-{selectedTeamId}</div>
+                                  <div><strong className="text-gray-900">วันที่ออกเอกสาร:</strong> {issueDateStr}</div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="text-center mt-4">
+                              <h1 className="font-black text-base md:text-lg text-gray-900 tracking-tight">
+                                เอกสารใบแจ้งรายละเอียดสวัสดิการค่าตอบแทนพิเศษ (สรุปรายทีม)
+                              </h1>
+                              <p className="text-xs font-semibold text-gray-700 mt-1">
+                                ประจำรอบการคำนวณ: <span className="text-gray-900 font-bold">{period?.name || ''}</span> ({formatDateTH(period?.start || '')} ถึง {formatDateTH(period?.end || '')})
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Team Info Metrics Header */}
+                          <div className="grid grid-cols-3 gap-3 mb-2 p-3 bg-white border border-gray-300 rounded-xl text-xs font-normal">
+                            <div>
+                              <span className="text-gray-600 block">ทีมช่างปฏิบัติงาน:</span>
+                              <strong className="text-sm text-gray-900 font-bold">{calcData.reportTeamLogs[selectedTeamId]?.name || ''}</strong>
+                            </div>
+                            <div>
+                              <span className="text-gray-600 block">จำนวนรายการงานทั้งหมด:</span>
+                              <strong className="text-sm text-gray-900 font-bold">
+                                {calcData.reportTeamLogs[selectedTeamId].rows.filter(r => !r.isHoliday).length} รายการ
+                              </strong>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-gray-600 block">ยอดรวม Incentive ทีมสุทธิ:</span>
+                              <strong className="text-base text-emerald-800 font-black">
+                                ฿{Math.round(
+                                  calcData.reportTeamLogs[selectedTeamId].rows.reduce(
+                                    (sum, r) => sum + (typeof r.inc === 'number' ? r.inc : 0),
+                                    0
+                                  )
+                                ).toLocaleString()}
+                              </strong>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Column Headers */}
                       <tr className="bg-white text-gray-900 font-bold border-b border-gray-300">
                         <th className="border border-gray-300 p-2 text-center w-10">ลำดับ</th>
                         <th className="border border-gray-300 p-2">วันที่</th>
@@ -294,68 +299,73 @@ export const Reports: React.FC<ReportsProps> = ({
           <div>
             {selectedTechId && calcData?.reportTechLogs?.[selectedTechId] ? (
               <div>
-                {/* Formal Corporate Header Block */}
-                <div className="border-b-2 border-gray-900 pb-4 mb-6">
-                  <div className="flex flex-wrap justify-between items-start gap-4">
-                    <div className="flex items-start gap-3">
-                      <img src={LOGO_URL} alt="PASAYA" className="h-[58px] w-auto object-contain flex-shrink-0" />
-                      <div className="text-xs text-gray-900 space-y-0.5">
-                        <h2 className="font-extrabold text-sm text-gray-900 tracking-tight leading-tight">
-                          บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
-                        </h2>
-                        <p className="text-[11px] text-gray-800 font-medium leading-tight whitespace-nowrap">
-                          77/191-192 อาคารสินสาธรทาวเวอร์ ชั้น 42 ถนนกรุงธนบุรี แขวงคลองต้นไทร เขตคลองสาน กรุงเทพฯ 10600 (สํานักงานใหญ่)
-                        </p>
-                        <p className="text-[11px] text-gray-800 font-medium leading-tight whitespace-nowrap">
-                          เลขประจําตัวผู้เสียภาษี 0105546015615 โทร: 0-2440-0955 แฟ็กซ์: 0-2440-0933-4
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right text-[11px]">
-                      <div className="inline-block border border-gray-300 rounded-lg p-2 bg-white text-left shadow-2xs">
-                        <div><strong className="text-gray-900">เลขที่เอกสาร:</strong> INC-TC-{(period?.id || '2026').replace(/[^a-zA-Z0-9]/g, '')}-{selectedTechId}</div>
-                        <div><strong className="text-gray-900">วันที่ออกเอกสาร:</strong> {issueDateStr}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-center mt-5">
-                    <h1 className="font-black text-base md:text-lg text-gray-900 tracking-tight">
-                      เอกสารใบแจ้งรายละเอียดสวัสดิการค่าตอบแทนพิเศษ
-                    </h1>
-                    <p className="text-xs font-semibold text-gray-700 mt-1">
-                      ประจำรอบการคำนวณ: <span className="text-gray-900 font-bold">{period?.name || ''}</span> ({formatDateTH(period?.start || '')} ถึง {formatDateTH(period?.end || '')})
-                    </p>
-                  </div>
-                </div>
-
-                {/* Individual Info Box */}
-                <div className="grid grid-cols-3 gap-3 mb-6 p-3 bg-white border border-gray-300 rounded-xl text-xs">
-                  <div>
-                    <span className="text-gray-600 block">ชื่อ-นามสกุล ช่าง:</span>
-                    <strong className="text-sm text-gray-900 font-bold">{calcData.reportTechLogs[selectedTechId]?.name || ''}</strong>
-                  </div>
-                  <div>
-                    <span className="text-gray-600 block">สังกัดทีมช่าง:</span>
-                    <strong className="text-sm text-gray-900 font-bold">{calcData.reportTechLogs[selectedTechId]?.teamName || ''}</strong>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-gray-600 block">ยอดรวม Incentive สุทธิส่วนบุคคล:</span>
-                    <strong className="text-base text-emerald-800 font-black">
-                      ฿{Math.round(
-                        calcData.reportTechLogs[selectedTechId].rows.reduce(
-                          (sum, r) => sum + (typeof r.inc === 'number' ? r.inc : 0),
-                          0
-                        )
-                      ).toLocaleString()}
-                    </strong>
-                  </div>
-                </div>
-
                 {/* Formal Table */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse border border-gray-300">
                     <thead>
+                      {/* Formal Corporate Header Block & Individual Info Box (Repeats on every printed page) */}
+                      <tr className="print-header-row">
+                        <td colSpan={10} className="print-header-cell border-none p-0 pb-4">
+                          <div className="border-b-2 border-gray-900 pb-4 mb-4">
+                            <div className="flex flex-wrap justify-between items-start gap-4">
+                              <div className="flex items-start gap-3">
+                                <img src={LOGO_URL} alt="PASAYA" className="h-[58px] w-auto object-contain flex-shrink-0" />
+                                <div className="text-xs text-gray-900 space-y-0.5">
+                                  <h2 className="font-extrabold text-sm text-gray-900 tracking-tight leading-tight">
+                                    บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
+                                  </h2>
+                                  <p className="text-[11px] text-gray-800 font-medium leading-tight whitespace-nowrap">
+                                    77/191-192 อาคารสินสาธรทาวเวอร์ ชั้น 42 ถนนกรุงธนบุรี แขวงคลองต้นไทร เขตคลองสาน กรุงเทพฯ 10600 (สํานักงานใหญ่)
+                                  </p>
+                                  <p className="text-[11px] text-gray-800 font-medium leading-tight whitespace-nowrap">
+                                    เลขประจําตัวผู้เสียภาษี 0105546015615 โทร: 0-2440-0955 แฟ็กซ์: 0-2440-0933-4
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right text-[11px]">
+                                <div className="inline-block border border-gray-300 rounded-lg p-2 bg-white text-left shadow-2xs">
+                                  <div><strong className="text-gray-900">เลขที่เอกสาร:</strong> INC-TC-{(period?.id || '2026').replace(/[^a-zA-Z0-9]/g, '')}-{selectedTechId}</div>
+                                  <div><strong className="text-gray-900">วันที่ออกเอกสาร:</strong> {issueDateStr}</div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="text-center mt-4">
+                              <h1 className="font-black text-base md:text-lg text-gray-900 tracking-tight">
+                                เอกสารใบแจ้งรายละเอียดสวัสดิการค่าตอบแทนพิเศษ
+                              </h1>
+                              <p className="text-xs font-semibold text-gray-700 mt-1">
+                                ประจำรอบการคำนวณ: <span className="text-gray-900 font-bold">{period?.name || ''}</span> ({formatDateTH(period?.start || '')} ถึง {formatDateTH(period?.end || '')})
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Individual Info Box */}
+                          <div className="grid grid-cols-3 gap-3 mb-2 p-3 bg-white border border-gray-300 rounded-xl text-xs font-normal">
+                            <div>
+                              <span className="text-gray-600 block">ชื่อ-นามสกุล ช่าง:</span>
+                              <strong className="text-sm text-gray-900 font-bold">{calcData.reportTechLogs[selectedTechId]?.name || ''}</strong>
+                            </div>
+                            <div>
+                              <span className="text-gray-600 block">สังกัดทีมช่าง:</span>
+                              <strong className="text-sm text-gray-900 font-bold">{calcData.reportTechLogs[selectedTechId]?.teamName || ''}</strong>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-gray-600 block">ยอดรวม Incentive สุทธิส่วนบุคคล:</span>
+                              <strong className="text-base text-emerald-800 font-black">
+                                ฿{Math.round(
+                                  calcData.reportTechLogs[selectedTechId].rows.reduce(
+                                    (sum, r) => sum + (typeof r.inc === 'number' ? r.inc : 0),
+                                    0
+                                  )
+                                ).toLocaleString()}
+                              </strong>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Column Headers */}
                       <tr className="bg-white text-gray-900 font-bold border-b border-gray-300">
                         <th className="border border-gray-300 p-2 text-center w-10">ลำดับ</th>
                         <th className="border border-gray-300 p-2">วันที่</th>
