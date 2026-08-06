@@ -12,6 +12,7 @@ interface TeamManagementProps {
   onUpdateMember: (teamId: string, memberId: string, data: Partial<TeamMember>) => void;
   onDeleteMember: (teamId: string, memberId: string) => void;
   onTransferMember: (sourceTeamId: string, member: TeamMember, targetTeamId: string, effectiveDate: string) => void;
+  onResetTeamsToDefault?: () => void;
   themeColor: string;
   themeTextColor: string;
 }
@@ -24,6 +25,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
   onUpdateMember,
   onDeleteMember,
   onTransferMember,
+  onResetTeamsToDefault,
   themeColor,
   themeTextColor
 }) => {
@@ -95,13 +97,23 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <div>
           <h2 className="text-lg font-bold text-gray-900">จัดการโครงสร้างทีมช่างติดตั้งผ้าม่าน</h2>
           <p className="text-xs text-gray-500">
             เพิ่ม แก้ไข หรือย้ายทีมช่าง พร้อมระบุวันเริ่มงานและวันลาออก เพื่อแบ่งยอด Incentive ถูกต้องตามประวัติ
           </p>
         </div>
+        {onResetTeamsToDefault && (
+          <button
+            onClick={onResetTeamsToDefault}
+            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl border border-gray-300 flex items-center gap-1.5 transition-colors shadow-sm"
+            title="รีเซ็ตทีมช่างทั้งหมดให้กลับไปเป็นค่าเริ่มต้นจากโค้ดล่าสุด"
+          >
+            <Users size={14} />
+            <span>ซิงค์ทีมช่างเป็นค่าเริ่มต้น</span>
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

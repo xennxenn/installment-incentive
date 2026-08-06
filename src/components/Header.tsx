@@ -98,7 +98,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <div>
               <h1 className="font-extrabold text-base md:text-lg text-gray-900 tracking-tight leading-tight">
-                PASAYA Curtain Incentive System
+                PASAYA - Installment Incentive Calculator
               </h1>
               <div className="flex items-center gap-3 text-xs text-gray-500">
                 <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200 text-[11px] font-bold">

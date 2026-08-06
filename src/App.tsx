@@ -193,7 +193,7 @@ export default function App() {
 
       setTimeout(() => {
         isRemoteUpdateRef.current = false;
-      }, 100);
+      }, 500);
     });
     return () => unsubscribe();
   }, []);
@@ -209,63 +209,63 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}app_users`, JSON.stringify(appUsers));
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ appUsers });
     }
   }, [appUsers]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}period`, JSON.stringify(period));
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ period });
     }
   }, [period]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}saved_periods`, JSON.stringify(savedPeriods));
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ savedPeriods });
     }
   }, [savedPeriods]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}teams`, JSON.stringify(teams));
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ teams });
     }
   }, [teams]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}jobs`, JSON.stringify(jobs));
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ jobs });
     }
   }, [jobs]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}leaves`, JSON.stringify(leaves));
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ leaves });
     }
   }, [leaves]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}holidays`, JSON.stringify(holidays));
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ holidays });
     }
   }, [holidays]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}theme_color`, themeColor);
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ themeColor });
     }
   }, [themeColor]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}rules`, JSON.stringify(rules));
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ rules });
     }
   }, [rules]);
@@ -543,13 +543,17 @@ export default function App() {
   // Team & Member Management Handlers
   const handleAddTeam = (name: string) => {
     const newT: Team = { id: `t-${Date.now()}`, name, members: [] };
-    setTeams(prev => [...prev, newT]);
+    const nextTeams = [...teams, newT];
+    setTeams(nextTeams);
+    saveToRealtimeDb({ teams: nextTeams });
     showNotification(`สร้างทีม ${name} เรียบร้อยแล้ว`);
   };
 
   const handleDeleteTeam = (id: string) => {
     requestConfirm('ลบทีมช่าง', 'การลบทีมจะมีผลกับสถิติรายงาน ยืนยันลบหรือไม่?', () => {
-      setTeams(prev => prev.filter(t => t.id !== id));
+      const nextTeams = teams.filter(t => t.id !== id);
+      setTeams(nextTeams);
+      saveToRealtimeDb({ teams: nextTeams });
       setConfirmModal(null);
       showNotification('ลบทีมเรียบร้อยแล้ว');
     });
@@ -557,33 +561,33 @@ export default function App() {
 
   const handleAddMember = (teamId: string, memberData: Omit<TeamMember, 'id'>) => {
     const newMemberRecord: TeamMember = { id: `m-${Date.now()}`, ...memberData };
-    setTeams(prev =>
-      prev.map(t => (t.id === teamId ? { ...t, members: [...(t.members || []), newMemberRecord] } : t))
-    );
+    const nextTeams = teams.map(t => (t.id === teamId ? { ...t, members: [...(t.members || []), newMemberRecord] } : t));
+    setTeams(nextTeams);
+    saveToRealtimeDb({ teams: nextTeams });
     showNotification(`เพิ่มช่าง ${memberData?.name || ''} เข้าทีมเรียบร้อย`);
   };
 
   const handleUpdateMember = (teamId: string, memberId: string, data: Partial<TeamMember>) => {
-    setTeams(prev =>
-      prev.map(t =>
-        t.id === teamId
-          ? {
-              ...t,
-              members: (t.members || []).map(m => (m.id === memberId ? { ...m, ...data } : m))
-            }
-          : t
-      )
+    const nextTeams = teams.map(t =>
+      t.id === teamId
+        ? {
+            ...t,
+            members: (t.members || []).map(m => (m.id === memberId ? { ...m, ...data } : m))
+          }
+        : t
     );
+    setTeams(nextTeams);
+    saveToRealtimeDb({ teams: nextTeams });
     showNotification('อัปเดตข้อมูลช่างสำเร็จ');
   };
 
   const handleDeleteMember = (teamId: string, memberId: string) => {
     requestConfirm('ลบช่างออกจากทีม', 'ยืนยันลบสมาชิกท่านนี้?', () => {
-      setTeams(prev =>
-        prev.map(t =>
-          t.id === teamId ? { ...t, members: (t.members || []).filter(m => m.id !== memberId) } : t
-        )
+      const nextTeams = teams.map(t =>
+        t.id === teamId ? { ...t, members: (t.members || []).filter(m => m.id !== memberId) } : t
       );
+      setTeams(nextTeams);
+      saveToRealtimeDb({ teams: nextTeams });
       setConfirmModal(null);
       showNotification('ลบช่างเรียบร้อยแล้ว');
     });
@@ -615,15 +619,29 @@ export default function App() {
 
     const updatedTargetMembers = [...(targetTeam.members || []), newTargetRecord];
 
-    setTeams(prev =>
-      prev.map(t => {
-        if (t.id === sourceTeamId) return { ...t, members: updatedSourceMembers };
-        if (t.id === targetTeamId) return { ...t, members: updatedTargetMembers };
-        return t;
-      })
-    );
+    const nextTeams = teams.map(t => {
+      if (t.id === sourceTeamId) return { ...t, members: updatedSourceMembers };
+      if (t.id === targetTeamId) return { ...t, members: updatedTargetMembers };
+      return t;
+    });
+
+    setTeams(nextTeams);
+    saveToRealtimeDb({ teams: nextTeams });
 
     showNotification(`ย้าย ${member?.name || ''} ไปยัง ${targetTeam?.name || ''} สำเร็จ ระบบคิดสัดส่วนตามวันย้ายให้อัตโนมัติ`);
+  };
+
+  const handleResetTeamsToDefault = () => {
+    requestConfirm(
+      'ยืนยันรีเซ็ตรายชื่อทีมช่าง',
+      'คุณต้องการรีเซ็ตรายชื่อทีมช่างทั้งหมดให้เป็นค่าเริ่มต้นตามโค้ดล่าสุด และบันทึกลงฐานข้อมูล Realtime ใช่หรือไม่?',
+      () => {
+        setTeams(INITIAL_TEAMS);
+        saveToRealtimeDb({ teams: INITIAL_TEAMS });
+        setConfirmModal(null);
+        showNotification('รีเซ็ตรายชื่อทีมช่างเป็นค่าเริ่มต้นล่าสุดและบันทึกลงฐานข้อมูลแล้ว', 'success');
+      }
+    );
   };
 
   // Calendar & Leave
@@ -725,6 +743,26 @@ export default function App() {
     });
   };
 
+  // Clear data for current calculation period (Super Admin only)
+  const handleClearPeriodData = () => {
+    if (currentUser?.role !== 'super_admin') {
+      showNotification('เฉพาะ Super Admin เท่านั้นที่สามารถลบข้อมูลในรอบคำนวณได้', 'warning');
+      return;
+    }
+    requestConfirm(
+      'ยืนยันการลบข้อมูลในรอบคำนวณ',
+      `คุณต้องการลบรายการงานและวันลาทั้งหมดในรอบคำนวณ (${safePeriod.start} ถึง ${safePeriod.end}) ใช่หรือไม่?`,
+      () => {
+        const start = safePeriod.start;
+        const end = safePeriod.end;
+        setJobs(prev => prev.filter(j => j.date && (j.date < start || j.date > end)));
+        setLeaves(prev => prev.filter(l => l.date && (l.date < start || l.date > end)));
+        setConfirmModal(null);
+        showNotification(`ลบข้อมูลในรอบคำนวณ ${start} ถึง ${end} เรียบร้อยแล้ว`, 'success');
+      }
+    );
+  };
+
   // --- Login View ---
   if (!currentUser) {
     return (
@@ -745,7 +783,7 @@ export default function App() {
             P
           </div>
           <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">
-            Curtain Incentive Calculator System
+            Installment Incentive Calculator
           </h2>
           <p className="text-xs text-gray-500 mt-1 mb-6">
             ระบบคำนวณค่า Incentive สำหรับทีมช่างติดตั้งผ้าม่าน
@@ -917,6 +955,7 @@ export default function App() {
             onUpdateMember={handleUpdateMember}
             onDeleteMember={handleDeleteMember}
             onTransferMember={handleTransferMember}
+            onResetTeamsToDefault={handleResetTeamsToDefault}
             themeColor={themeColor}
             themeTextColor={themeTextColor}
           />
@@ -957,6 +996,9 @@ export default function App() {
             }}
             onCleanGhostData={handleCleanGhostData}
             onResetData={handleResetData}
+            periodStart={safePeriod.start}
+            periodEnd={safePeriod.end}
+            onClearPeriodData={handleClearPeriodData}
           />
         )}
       </main>

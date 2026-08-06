@@ -47,6 +47,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
   setJobSortOrder
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterByPeriod, setFilterByPeriod] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
 
   // CSV Import State
@@ -399,25 +400,38 @@ export const JobManagement: React.FC<JobManagementProps> = ({
   };
 
   const filteredJobs = jobs.filter(j => {
+    const inPeriod = !filterByPeriod || !j.date || (j.date >= periodStart && j.date <= periodEnd);
     const q = searchQuery.toLowerCase();
-    return (
+    const matchesSearch =
       !q ||
       (j.customer || '').toLowerCase().includes(q) ||
       (j.orderNo || '').toLowerCase().includes(q) ||
       (j.location || '').toLowerCase().includes(q) ||
-      (j.date || '').includes(q)
-    );
+      (j.date || '').includes(q);
+    return inPeriod && matchesSearch;
   });
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
       {/* Header Bar */}
       <div className="p-4 border-b border-gray-200 bg-gray-50/80 flex flex-wrap justify-between items-center gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <h2 className="font-bold text-gray-800 text-base">รายการบันทึกงานติดตั้งผ้าม่าน</h2>
           <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-semibold">
             {filteredJobs.length} งาน
           </span>
+          <button
+            onClick={() => setFilterByPeriod(!filterByPeriod)}
+            className={`text-xs px-2.5 py-1 rounded-lg border font-semibold flex items-center gap-1.5 transition-colors ${
+              filterByPeriod
+                ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+                : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'
+            }`}
+            title="คลิกเพื่อสลับการกรองแสดงเฉพาะในรอบคำนวณ"
+          >
+            <Calendar size={13} />
+            <span>{filterByPeriod ? `รอบ: ${periodStart} ถึง ${periodEnd}` : 'แสดงทุกรอบคำนวณ'}</span>
+          </button>
         </div>
 
         {/* Controls */}

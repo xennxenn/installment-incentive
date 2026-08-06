@@ -45,7 +45,7 @@ export function subscribeToRealtimeData(
           updatedAt: Date.now()
         };
         try {
-          await setDoc(MAIN_DOC_REF, initialSeed);
+          await setDoc(MAIN_DOC_REF, sanitizeForFirestore(initialSeed));
         } catch (e) {
           console.error('Failed to seed initial Firestore data:', e);
         }
@@ -62,19 +62,35 @@ export function subscribeToRealtimeData(
   );
 }
 
+function sanitizeForFirestore(obj: any): any {
+  if (obj === undefined) {
+    return null;
+  }
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeForFirestore(item)).filter(item => item !== undefined);
+  }
+  const sanitized: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      sanitized[key] = sanitizeForFirestore(value);
+    }
+  }
+  return sanitized;
+}
+
 /**
  * Save updated fields to Firestore in realtime.
  */
 export async function saveToRealtimeDb(partialData: Partial<AppFirebaseData>): Promise<void> {
   try {
-    await setDoc(
-      MAIN_DOC_REF,
-      {
-        ...partialData,
-        updatedAt: Date.now()
-      },
-      { merge: true }
-    );
+    const sanitizedData = sanitizeForFirestore({
+      ...partialData,
+      updatedAt: Date.now()
+    });
+    await setDoc(MAIN_DOC_REF, sanitizedData, { merge: true });
   } catch (err) {
     console.error('Error saving to Firestore:', err);
   }

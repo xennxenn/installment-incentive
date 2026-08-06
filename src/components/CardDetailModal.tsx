@@ -274,7 +274,7 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
                             </td>
                             <td className="p-2.5 text-center">
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                                {JOB_TYPES.find(j => j.id === job.jobType)?.label || job.jobType}
+                                {JOB_TYPES.find(j => j.id === job.type)?.label || job.type}
                               </span>
                             </td>
                             <td className="p-2.5 text-right font-black text-blue-600 text-sm">
@@ -320,7 +320,7 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {calcData.periodJobs
-                        .filter(j => j.jobType === 'measure')
+                        .filter(j => j.type === 'measure')
                         .filter(j => {
                           if (!searchTerm) return true;
                           const term = searchTerm.toLowerCase();
@@ -463,7 +463,7 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
                             </td>
                             <td className="p-2.5 text-center">
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-700 border">
-                                {JOB_TYPES.find(j => j.id === job.jobType)?.label || job.jobType}
+                                {JOB_TYPES.find(j => j.id === job.type)?.label || job.type}
                               </span>
                             </td>
                             <td className="p-2.5 text-center font-bold text-blue-600">{job.rails}</td>

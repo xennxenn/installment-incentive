@@ -13,6 +13,9 @@ interface AdminSettingsProps {
   onSaveTheme: (color: string) => void;
   onCleanGhostData: () => void;
   onResetData: () => void;
+  periodStart: string;
+  periodEnd: string;
+  onClearPeriodData: () => void;
 }
 
 const COLOR_PRESETS = [
@@ -32,7 +35,10 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   themeColor,
   onSaveTheme,
   onCleanGhostData,
-  onResetData
+  onResetData,
+  periodStart,
+  periodEnd,
+  onClearPeriodData
 }) => {
   const [selectedColor, setSelectedColor] = useState(themeColor);
   const [newUser, setNewUser] = useState({
@@ -224,6 +230,25 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
           </h3>
 
           <div className="space-y-3">
+            <div className="bg-rose-50 border border-rose-200 p-4 rounded-xl flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
+                  <Trash2 size={14} className="text-rose-600" />
+                  <span>ลบข้อมูลทั้งหมดในรอบคำนวณ ({periodStart} ถึง {periodEnd})</span>
+                </p>
+                <p className="text-[11px] text-rose-700 mt-0.5">
+                  ลบรายการงานติดตั้งและวันลาทั้งหมดเฉพาะที่อยู่ในช่วงรอบคำนวณนี้ออกทั้งหมด (เฉพาะ Super Admin)
+                </p>
+              </div>
+              <button
+                onClick={onClearPeriodData}
+                className="bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 shadow-sm transition-colors"
+              >
+                <Trash2 size={14} />
+                <span>Clear ข้อมูลรอบนี้</span>
+              </button>
+            </div>
+
             <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs font-bold text-blue-900">

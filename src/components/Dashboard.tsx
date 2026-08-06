@@ -37,33 +37,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Formula & Rule Banner */}
-      <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-2xl p-4 md:p-5 shadow-md flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm">
-            <Info className="text-amber-400" size={20} />
-          </div>
-          <div>
-            <div className="font-bold text-sm md:text-base flex items-center gap-2">
-              <span>เกณฑ์การคิดค่า Incentive ติดตั้งผ้าม่าน</span>
-              <span className="text-[10px] bg-amber-400/20 text-amber-300 font-semibold px-2 py-0.5 rounded-full border border-amber-400/30">
-                อัปเดตปัจจุบัน
-              </span>
-            </div>
-            <p className="text-xs text-gray-300 mt-0.5">
-              ฐานค่าช่าง ฿{rules.baseTechPay}/คน • ฟรี {rules.freeRailsThreshold} รางแรก • รางส่วนเกิน ฿{rules.extraRailRate}/ราง • วัดพื้นที่ ฿{rules.measureTechPay}/คน
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={onOpenRulesModal}
-          className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-white/20 transition-all cursor-pointer"
-        >
-          <Sliders size={14} />
-          <span>ปรับตั้งสูตร</span>
-        </button>
-      </div>
-
       {/* Metric Cards Grid - Clickable for details */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
         
