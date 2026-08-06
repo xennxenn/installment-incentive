@@ -117,7 +117,7 @@ export const Reports: React.FC<ReportsProps> = ({
                 <div className="border-b-2 border-gray-900 pb-4 mb-6">
                   <div className="flex flex-wrap justify-between items-start gap-4">
                     <div className="flex items-start gap-3">
-                      <img src={LOGO_URL} alt="PASAYA" className="h-10 w-auto object-contain mt-0.5" />
+                      <img src={LOGO_URL} alt="PASAYA" className="h-[58px] w-auto object-contain flex-shrink-0" />
                       <div className="text-xs text-gray-900 space-y-0.5">
                         <h2 className="font-extrabold text-sm text-gray-900 tracking-tight leading-tight">
                           บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
@@ -298,7 +298,7 @@ export const Reports: React.FC<ReportsProps> = ({
                 <div className="border-b-2 border-gray-900 pb-4 mb-6">
                   <div className="flex flex-wrap justify-between items-start gap-4">
                     <div className="flex items-start gap-3">
-                      <img src={LOGO_URL} alt="PASAYA" className="h-10 w-auto object-contain mt-0.5" />
+                      <img src={LOGO_URL} alt="PASAYA" className="h-[58px] w-auto object-contain flex-shrink-0" />
                       <div className="text-xs text-gray-900 space-y-0.5">
                         <h2 className="font-extrabold text-sm text-gray-900 tracking-tight leading-tight">
                           บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด

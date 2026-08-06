@@ -169,6 +169,7 @@ export default function App() {
 
   // --- Realtime Firestore Sync ---
   const isRemoteUpdateRef = useRef(false);
+  const hasLoadedFromRemoteRef = useRef(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToRealtimeData((data) => {
@@ -182,6 +183,8 @@ export default function App() {
       if (data.rules && typeof data.rules === 'object') setRules(prev => ({ ...prev, ...data.rules }));
       if (data.appUsers && Array.isArray(data.appUsers)) setAppUsers(data.appUsers);
       if (data.themeColor) setThemeColor(data.themeColor);
+
+      hasLoadedFromRemoteRef.current = true;
 
       setTimeout(() => {
         isRemoteUpdateRef.current = false;
@@ -200,6 +203,7 @@ export default function App() {
   }, [currentUser]);
 
   useEffect(() => {
+    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}app_users`, JSON.stringify(appUsers));
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ appUsers });
@@ -207,6 +211,7 @@ export default function App() {
   }, [appUsers]);
 
   useEffect(() => {
+    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}period`, JSON.stringify(period));
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ period });
@@ -214,6 +219,7 @@ export default function App() {
   }, [period]);
 
   useEffect(() => {
+    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}saved_periods`, JSON.stringify(savedPeriods));
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ savedPeriods });
@@ -221,6 +227,7 @@ export default function App() {
   }, [savedPeriods]);
 
   useEffect(() => {
+    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}teams`, JSON.stringify(teams));
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ teams });
@@ -228,6 +235,7 @@ export default function App() {
   }, [teams]);
 
   useEffect(() => {
+    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}jobs`, JSON.stringify(jobs));
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ jobs });
@@ -235,6 +243,7 @@ export default function App() {
   }, [jobs]);
 
   useEffect(() => {
+    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}leaves`, JSON.stringify(leaves));
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ leaves });
@@ -242,6 +251,7 @@ export default function App() {
   }, [leaves]);
 
   useEffect(() => {
+    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}holidays`, JSON.stringify(holidays));
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ holidays });
@@ -249,6 +259,7 @@ export default function App() {
   }, [holidays]);
 
   useEffect(() => {
+    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}theme_color`, themeColor);
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ themeColor });
@@ -256,6 +267,7 @@ export default function App() {
   }, [themeColor]);
 
   useEffect(() => {
+    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}rules`, JSON.stringify(rules));
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ rules });
@@ -396,6 +408,31 @@ export default function App() {
     };
     setJobs(prev => [newJob, ...prev]);
     showNotification('เพิ่มงานติดตั้งใหม่สำเร็จ');
+  };
+
+  const handleBatchAddJobs = (importedJobsData: Partial<Job>[]) => {
+    if (!importedJobsData || importedJobsData.length === 0) return;
+    const baseTime = Date.now();
+    const newJobs: Job[] = importedJobsData.map((data, idx) => {
+      const type = data.type || 'install';
+      const timestamp = baseTime + idx;
+      return {
+        id: `job-${timestamp}-${Math.random().toString(36).substring(2, 6)}`,
+        date: data.date || safePeriod.start,
+        timeSlot: data.timeSlot || '10.00 - 11.30',
+        orderNo: (data.orderNo || '').trim().toUpperCase() || '-',
+        customer: data.customer || '',
+        location: data.location || '',
+        type,
+        rails: formatQuantity(type, data.rails || 0),
+        selectedTechs: data.selectedTechs || [],
+        isChecked: !!data.isChecked,
+        orderIndex: timestamp
+      };
+    });
+
+    setJobs(prev => [...newJobs, ...prev]);
+    showNotification(`นำเข้าข้อมูลเรียบร้อยแล้ว ${newJobs.length} รายการ`);
   };
 
   const handleUpdateJob = (id: string, field: keyof Job, value: any) => {
@@ -856,6 +893,7 @@ export default function App() {
             teams={teams}
             leaves={leaves}
             onAddJob={handleAddJob}
+            onBatchAddJobs={handleBatchAddJobs}
             onUpdateJob={handleUpdateJob}
             onDeleteJob={handleDeleteJob}
             onMoveJob={handleMoveJob}

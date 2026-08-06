@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Search, Plus, FileSpreadsheet, ArrowUp, ArrowDown, CheckSquare, 
-  Square, Trash2, X, AlertCircle, CheckCircle2, SlidersHorizontal, Calendar, Clock
+  Square, Trash2, X, AlertCircle, CheckCircle2, SlidersHorizontal, Calendar, Clock,
+  Upload, FileUp, Download
 } from 'lucide-react';
 import { Job, Team, LeaveRecord, JobTypeId } from '../types';
 import { JOB_TYPES, TIME_SLOTS, DEFAULT_TIME_SLOT } from '../data/initialData';
@@ -11,6 +12,7 @@ interface JobManagementProps {
   teams: Team[];
   leaves: LeaveRecord[];
   onAddJob: (jobData: Partial<Job>) => void;
+  onBatchAddJobs?: (importedJobs: Partial<Job>[]) => void;
   onUpdateJob: (id: string, field: keyof Job, value: any) => void;
   onDeleteJob: (id: string) => void;
   onMoveJob: (id: string, direction: -1 | 1) => void;
@@ -29,6 +31,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
   teams,
   leaves,
   onAddJob,
+  onBatchAddJobs,
   onUpdateJob,
   onDeleteJob,
   onMoveJob,
@@ -43,6 +46,12 @@ export const JobManagement: React.FC<JobManagementProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // CSV Import State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFileName, setImportFileName] = useState('');
+  const [importPreviewJobs, setImportPreviewJobs] = useState<Partial<Job>[]>([]);
 
   // Form state for new job
   const [newDate, setNewDate] = useState(() => {
@@ -87,6 +96,226 @@ export const JobManagement: React.FC<JobManagementProps> = ({
     setNewSelectedTechs(prev =>
       prev.includes(techId) ? prev.filter(id => id !== techId) : [...prev, techId]
     );
+  };
+
+  // --- CSV Import Utilities ---
+  const parseCSVText = (text: string): string[][] => {
+    const lines: string[][] = [];
+    let currentRow: string[] = [];
+    let currentVal = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const nextChar = text[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          currentVal += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        currentRow.push(currentVal.trim());
+        currentVal = '';
+      } else if ((char === '\r' || char === '\n') && !inQuotes) {
+        if (char === '\r' && nextChar === '\n') i++;
+        currentRow.push(currentVal.trim());
+        if (currentRow.some(c => c.length > 0)) lines.push(currentRow);
+        currentRow = [];
+        currentVal = '';
+      } else {
+        currentVal += char;
+      }
+    }
+    if (currentVal.length > 0 || currentRow.length > 0) {
+      currentRow.push(currentVal.trim());
+      if (currentRow.some(c => c.length > 0)) lines.push(currentRow);
+    }
+    return lines;
+  };
+
+  const normalizeDate = (dateStr: string, fallback: string): string => {
+    if (!dateStr) return fallback;
+    const s = dateStr.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const dmY = s.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/);
+    if (dmY) {
+      const day = dmY[1].padStart(2, '0');
+      const month = dmY[2].padStart(2, '0');
+      const year = dmY[3];
+      return `${year}-${month}-${day}`;
+    }
+    return s || fallback;
+  };
+
+  const matchJobType = (typeStr: string): JobTypeId => {
+    if (!typeStr) return 'install';
+    const s = typeStr.trim();
+
+    if (s.includes('บันไดสูง')) return 'install_high';
+    if (s.includes('ติดตั้ง') && s.includes('นั่งร้าน')) return 'install_scaffold';
+    if (s.includes('แก้ไข') && s.includes('นั่งร้าน')) return 'fix_scaffold';
+    if (/wall\s*linen/i.test(s) || s.includes('วอลล์ลิเนน')) return 'install_wall_linen';
+    if (/wall\s*mural/i.test(s) || s.includes('วอลล์มิวรัล')) return 'install_wall_mural';
+    if (s.includes('วัดพื้นที่')) return 'measure';
+    if (s.includes('แก้ไขซ้ำ') || s.includes('ไม่คิดค่า')) return 'fix_free';
+    if (s.includes('แก้ไข')) return 'fix';
+    if (s.includes('เดินทางไป')) return 'travel_go';
+    if (s.includes('เดินทางกลับ')) return 'travel_back';
+    if (s.includes('ติดตั้ง')) return 'install';
+
+    return 'install';
+  };
+
+  const matchTechnicians = (techText: string, teamList: Team[]): string[] => {
+    if (!techText) return [];
+    const allMembers = (teamList || []).flatMap(t => t.members || []);
+    
+    // Split by commas, slashes, pluses, or Thai conjunctions
+    const rawParts = techText.split(/[,/+]|\s+และ\s+/).map(s => s.trim()).filter(Boolean);
+    const matchedIds: string[] = [];
+
+    for (const part of rawParts) {
+      const cleanPart = part.replace(/^ช่าง/, '').trim();
+      if (!cleanPart) continue;
+
+      let found = allMembers.find(
+        m => m.name.trim() === part || m.name.replace(/^ช่าง/, '').trim() === cleanPart
+      );
+
+      if (!found && cleanPart.length >= 2) {
+        found = allMembers.find(m => {
+          const memberClean = m.name.replace(/^ช่าง/, '').trim();
+          return memberClean.includes(cleanPart) || cleanPart.includes(memberClean);
+        });
+      }
+
+      if (found && !matchedIds.includes(found.id)) {
+        matchedIds.push(found.id);
+      }
+    }
+
+    return matchedIds;
+  };
+
+  const handleDownloadTemplate = () => {
+    const headers = "วันที่,ลูกค้า,สถานที่,Order No,เวลา,ประเภทงาน,จำนวนราง,ทีมช่าง,รายชื่อช่าง,ตรวจสอบ,ค่า Incentive\n";
+    const exampleRows = [
+      '2026-08-05,"คุณวสุ","พังงา","2600673/1",10.00 - 17.00,ติดตั้ง,5,"ช่างนาย, ช่างเซฟ",ยังไม่ตรวจ,500',
+      '2026-08-04,"คุณกีรติ ณ ระนอง (พี)","สายไหม","2600689/1",15.30 - 17.00,ติดตั้ง,3,"ช่างเบนซ์",ยังไม่ตรวจ,250',
+      '2026-08-04,"คุณสมเกียรติ","สุขุมวิท50","-",13.00 - 17.00,วัดพื้นที่,30,"ช่างเบนซ์, ช่างกี้",ยังไม่ตรวจ,500'
+    ].join('\n');
+
+    const blob = new Blob(['\uFEFF' + headers + exampleRows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'curtain_jobs_import_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+
+      const lines = parseCSVText(text);
+      if (lines.length === 0) return;
+
+      // Default column indices based on template:
+      // วันที่,ลูกค้า,สถานที่,Order No,เวลา,ประเภทงาน,จำนวนราง,ทีมช่าง,รายชื่อช่าง,ตรวจสอบ,ค่า Incentive
+      let dateIdx = 0;
+      let customerIdx = 1;
+      let locationIdx = 2;
+      let orderNoIdx = 3;
+      let timeSlotIdx = 4;
+      let typeIdx = 5;
+      let railsIdx = 6;
+      let teamListIdx = 7;
+      let techListIdx = 8;
+      let checkedIdx = 9;
+
+      const firstRow = lines[0].map(h => h.toLowerCase().trim());
+      let hasHeader = false;
+
+      // Check if first row is header
+      firstRow.forEach((h, i) => {
+        if (h.includes('วัน')) { dateIdx = i; hasHeader = true; }
+        else if (h.includes('ลูกค้า')) { customerIdx = i; hasHeader = true; }
+        else if (h.includes('สถานที่')) { locationIdx = i; hasHeader = true; }
+        else if (h.includes('order')) { orderNoIdx = i; hasHeader = true; }
+        else if (h.includes('เวลา')) { timeSlotIdx = i; hasHeader = true; }
+        else if (h.includes('ประเภท')) { typeIdx = i; hasHeader = true; }
+        else if (h.includes('ราง') || h.includes('จำนวน')) { railsIdx = i; hasHeader = true; }
+        else if (h.includes('รายชื่อช่าง') || h.includes('ช่าง')) { techListIdx = i; hasHeader = true; }
+        else if (h.includes('ทีม')) { teamListIdx = i; hasHeader = true; }
+        else if (h.includes('ตรวจ')) { checkedIdx = i; hasHeader = true; }
+      });
+
+      const dataRows = hasHeader ? lines.slice(1) : lines;
+      const parsedJobs: Partial<Job>[] = [];
+
+      dataRows.forEach(row => {
+        if (!row || row.length < 2) return;
+        const rawDate = row[dateIdx] || '';
+        const dateStr = normalizeDate(rawDate, periodStart);
+        const customer = row[customerIdx] || '';
+        const location = row[locationIdx] || '';
+        
+        let rawOrderNo = (row[orderNoIdx] || '').trim();
+        if (rawOrderNo === '-' || !rawOrderNo) rawOrderNo = '-';
+        else rawOrderNo = rawOrderNo.toUpperCase();
+
+        const timeSlot = row[timeSlotIdx] || DEFAULT_TIME_SLOT;
+        const type = matchJobType(row[typeIdx] || '');
+        const rails = parseFloat(row[railsIdx]) || 0;
+
+        const techText = (row[techListIdx] || '') + ' ' + (row[teamListIdx] || '');
+        const selectedTechs = matchTechnicians(techText, teams);
+
+        const rawChecked = (row[checkedIdx] || '').trim();
+        const isChecked = rawChecked === 'ตรวจแล้ว' || rawChecked === 'ตรวจสอบแล้ว' || rawChecked === 'true';
+
+        parsedJobs.push({
+          date: dateStr,
+          customer,
+          location,
+          orderNo: rawOrderNo,
+          timeSlot,
+          type,
+          rails,
+          selectedTechs,
+          isChecked
+        });
+      });
+
+      setImportPreviewJobs(parsedJobs);
+      setShowImportModal(true);
+
+      // Reset file input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    reader.readAsText(file, 'UTF-8');
+  };
+
+  const handleConfirmImport = () => {
+    if (importPreviewJobs.length > 0 && onBatchAddJobs) {
+      onBatchAddJobs(importPreviewJobs);
+    }
+    setShowImportModal(false);
+    setImportPreviewJobs([]);
+    setImportFileName('');
   };
 
   const filteredJobs = jobs.filter(j => {
@@ -143,10 +372,27 @@ export const JobManagement: React.FC<JobManagementProps> = ({
             <option value="asc">เรียง: เก่าสุดขึ้นก่อน</option>
           </select>
 
-          {/* CSV Export */}
+          {/* CSV Import & Export */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept=".csv,text/csv"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+            title="นำเข้าข้อมูลงานจากไฟล์ CSV"
+          >
+            <Upload size={14} />
+            <span>นำเข้า CSV</span>
+          </button>
+
           <button
             onClick={onExportCSV}
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+            title="ส่งออกรายการงานเป็นไฟล์ CSV"
           >
             <FileSpreadsheet size={14} />
             <span>ส่งออก CSV</span>
@@ -587,6 +833,149 @@ export const JobManagement: React.FC<JobManagementProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CSV Import Preview Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-gray-100">
+            {/* Header */}
+            <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
+                  <Upload size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-800 text-base">
+                    ตรวจสอบข้อมูลก่อนนำเข้า CSV (Preview Import)
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    ไฟล์: <span className="font-semibold text-gray-700">{importFileName}</span> | พบทั้งหมด{' '}
+                    <span className="font-bold text-blue-600">{importPreviewJobs.length}</span> รายการ
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleDownloadTemplate}
+                  className="text-xs text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 font-semibold"
+                  title="ดาวน์โหลดไฟล์ตัวอย่าง Template CSV"
+                >
+                  <Download size={13} />
+                  <span>โหลด Template CSV</span>
+                </button>
+                <button
+                  onClick={() => setShowImportModal(false)}
+                  className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Table Preview Body */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {importPreviewJobs.length === 0 ? (
+                <div className="p-8 text-center text-gray-500 text-sm">
+                  ไม่พบข้อมูลงานที่ถูกต้องในไฟล์ CSV กรุณาตรวจสอบโครงสร้างไฟล์ตาม Template
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-gray-100 text-gray-600 font-bold border-b border-gray-200">
+                      <tr>
+                        <th className="p-2.5 text-center w-8">#</th>
+                        <th className="p-2.5 w-24">วันที่</th>
+                        <th className="p-2.5 w-28">Order No</th>
+                        <th className="p-2.5">ลูกค้า & สถานที่</th>
+                        <th className="p-2.5 w-28">ประเภทงาน</th>
+                        <th className="p-2.5 text-center w-16">จำนวน</th>
+                        <th className="p-2.5">ทีมช่างที่แมตช์ได้</th>
+                        <th className="p-2.5 text-center w-20">สถานะ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {importPreviewJobs.map((job, idx) => {
+                        const typeInfo = JOB_TYPES.find(t => t.id === job.type);
+                        const matchedMembers = (teams || [])
+                          .flatMap(t => t.members || [])
+                          .filter(m => (job.selectedTechs || []).includes(m.id));
+
+                        return (
+                          <tr key={idx} className="hover:bg-blue-50/40">
+                            <td className="p-2.5 text-center font-mono text-gray-400">{idx + 1}</td>
+                            <td className="p-2.5 whitespace-nowrap font-medium text-gray-700">{job.date}</td>
+                            <td className="p-2.5 whitespace-nowrap font-bold text-blue-700">{job.orderNo}</td>
+                            <td className="p-2.5">
+                              <div className="font-semibold text-gray-800">{job.customer || '-'}</div>
+                              <div className="text-[10px] text-gray-500">{job.location || '-'}</div>
+                            </td>
+                            <td className="p-2.5 whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                                {typeInfo?.label || job.type}
+                              </span>
+                            </td>
+                            <td className="p-2.5 text-center font-bold text-gray-800">{job.rails}</td>
+                            <td className="p-2.5">
+                              {matchedMembers.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {matchedMembers.map(m => (
+                                    <span key={m.id} className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                                      {m.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-amber-600 text-[10px] font-medium italic">
+                                  ยังไม่ได้แมตช์ช่าง
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-2.5 text-center">
+                              {job.isChecked ? (
+                                <span className="text-emerald-600 font-bold text-[10px]">ตรวจแล้ว</span>
+                              ) : (
+                                <span className="text-gray-400 text-[10px]">ยังไม่ตรวจ</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t bg-gray-50 flex items-center justify-between">
+              <span className="text-xs text-gray-500">
+                * ตรวจสอบความถูกต้อง แล้วกดปุ่มยืนยันเพื่อบันทึกเข้าสู่ระบบ
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowImportModal(false)}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-xl font-semibold text-xs text-gray-700 transition-colors"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmImport}
+                  disabled={importPreviewJobs.length === 0}
+                  style={{ backgroundColor: themeColor, color: themeTextColor }}
+                  className="px-5 py-2 rounded-xl font-bold text-xs shadow-md hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <CheckCircle2 size={15} />
+                  <span>ยืนยันนำเข้าข้อมูล {importPreviewJobs.length} รายการ</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
