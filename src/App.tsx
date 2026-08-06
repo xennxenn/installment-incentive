@@ -209,63 +209,63 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}app_users`, JSON.stringify(appUsers));
-    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
+    if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ appUsers });
     }
   }, [appUsers]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}period`, JSON.stringify(period));
-    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
+    if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ period });
     }
   }, [period]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}saved_periods`, JSON.stringify(savedPeriods));
-    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
+    if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ savedPeriods });
     }
   }, [savedPeriods]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}teams`, JSON.stringify(teams));
-    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
+    if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ teams });
     }
   }, [teams]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}jobs`, JSON.stringify(jobs));
-    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
+    if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ jobs });
     }
   }, [jobs]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}leaves`, JSON.stringify(leaves));
-    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
+    if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ leaves });
     }
   }, [leaves]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}holidays`, JSON.stringify(holidays));
-    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
+    if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ holidays });
     }
   }, [holidays]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}theme_color`, themeColor);
-    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
+    if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ themeColor });
     }
   }, [themeColor]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}rules`, JSON.stringify(rules));
-    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
+    if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ rules });
     }
   }, [rules]);
