@@ -1,0 +1,6 @@
+{
+  "name": "Curtain Installer Incentive System",
+  "description": "ระบบคำนวณค่า Incentive สำหรับทีมช่างและพนักงานติดตั้งผ้าม่าน",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
