@@ -126,16 +126,19 @@ export function calculateIncentives(
   let globalTotalMeasureJobs = 0;
 
   // 1. Process each job to compute calculatedValue and split into teams
-  periodJobs.forEach(job => {
+  safeJobs.forEach(job => {
     let val = 0;
     const rails = Math.max(0, parseInt(String(job.rails)) || 0);
+    const isInPeriod = job && job.date && job.date >= safePeriod.start && job.date <= safePeriod.end;
     const excludedTypes: JobTypeId[] = ['measure', 'travel_go', 'travel_back', 'fix_free', 'install_wall_linen', 'install_wall_mural'];
 
-    if (!excludedTypes.includes(job.type)) {
-      globalTotalRails += rails;
-    }
-    if (job.type === 'measure') {
-      globalTotalMeasureJobs += 1;
+    if (isInPeriod) {
+      if (!excludedTypes.includes(job.type)) {
+        globalTotalRails += rails;
+      }
+      if (job.type === 'measure') {
+        globalTotalMeasureJobs += 1;
+      }
     }
 
     // Filter valid techs: person existed and active on that day
@@ -191,7 +194,7 @@ export function calculateIncentives(
     (job as Job & { calculatedValue?: number }).calculatedValue = val;
 
     // Distribute to teams involved
-    if (cnt > 0) {
+    if (isInPeriod && cnt > 0) {
       const teamsInvolved: Record<string, number> = {};
       payingTechs.forEach(tid => {
         const t = safeTeams.find(x => (x?.members || []).some(m => m && m.id === tid));

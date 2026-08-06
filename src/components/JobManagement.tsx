@@ -4,15 +4,16 @@ import {
   Square, Trash2, X, AlertCircle, CheckCircle2, SlidersHorizontal, Calendar, Clock,
   Upload, FileUp, Download
 } from 'lucide-react';
-import { Job, Team, LeaveRecord, JobTypeId } from '../types';
+import { Job, Team, LeaveRecord, JobTypeId, IncentiveRules } from '../types';
 import { JOB_TYPES, TIME_SLOTS, DEFAULT_TIME_SLOT } from '../data/initialData';
 
 interface JobManagementProps {
   jobs: Job[];
   teams: Team[];
   leaves: LeaveRecord[];
+  rules?: IncentiveRules;
   onAddJob: (jobData: Partial<Job>) => void;
-  onBatchAddJobs?: (importedJobs: Partial<Job>[]) => void;
+  onBatchAddJobs?: (importedJobs: Partial<Job>[], updatedTeams?: Team[]) => void;
   onUpdateJob: (id: string, field: keyof Job, value: any) => void;
   onDeleteJob: (id: string) => void;
   onMoveJob: (id: string, direction: -1 | 1) => void;
@@ -30,6 +31,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
   jobs,
   teams,
   leaves,
+  rules,
   onAddJob,
   onBatchAddJobs,
   onUpdateJob,
@@ -52,6 +54,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFileName, setImportFileName] = useState('');
   const [importPreviewJobs, setImportPreviewJobs] = useState<Partial<Job>[]>([]);
+  const [pendingUpdatedTeams, setPendingUpdatedTeams] = useState<Team[] | null>(null);
 
   // Form state for new job
   const [newDate, setNewDate] = useState(() => {
@@ -218,6 +221,26 @@ export const JobManagement: React.FC<JobManagementProps> = ({
     document.body.removeChild(link);
   };
 
+  const computeIncentiveForPreview = (job: Partial<Job>, matchedTechCount: number) => {
+    const type = job.type || 'install';
+    const rails = job.rails || 0;
+    const r = rules || { baseTechPay: 250, freeRailsThreshold: 10, extraRailRate: 20, measureTechPay: 250, highLadderBonus: 100, scaffoldBonus: 200, wallLinenSqmRate: 50, wallMuralSqmRate: 75 };
+
+    if (matchedTechCount === 0) return 0;
+    if (type === 'measure') return (r.measureTechPay || 250) * matchedTechCount;
+    if (type === 'install_wall_linen') return rails * (r.wallLinenSqmRate ?? 50);
+    if (type === 'install_wall_mural') return rails * (r.wallMuralSqmRate ?? 75);
+    if (['travel_go', 'travel_back', 'fix_free'].includes(type)) return 0;
+
+    const basePay = (r.baseTechPay || 250) * matchedTechCount;
+    const extraRails = rails > (r.freeRailsThreshold || 10) ? (rails - (r.freeRailsThreshold || 10)) * (r.extraRailRate || 20) : 0;
+    let specialBonus = 0;
+    if (type === 'install_high') specialBonus = r.highLadderBonus || 100;
+    if (type === 'install_scaffold' || type === 'fix_scaffold') specialBonus = r.scaffoldBonus || 200;
+
+    return basePay + extraRails + specialBonus;
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -232,8 +255,6 @@ export const JobManagement: React.FC<JobManagementProps> = ({
       const lines = parseCSVText(text);
       if (lines.length === 0) return;
 
-      // Default column indices based on template:
-      // วันที่,ลูกค้า,สถานที่,Order No,เวลา,ประเภทงาน,จำนวนราง,ทีมช่าง,รายชื่อช่าง,ตรวจสอบ,ค่า Incentive
       let dateIdx = 0;
       let customerIdx = 1;
       let locationIdx = 2;
@@ -248,7 +269,6 @@ export const JobManagement: React.FC<JobManagementProps> = ({
       const firstRow = lines[0].map(h => h.toLowerCase().trim());
       let hasHeader = false;
 
-      // Check if first row is header
       firstRow.forEach((h, i) => {
         if (h.includes('วัน')) { dateIdx = i; hasHeader = true; }
         else if (h.includes('ลูกค้า')) { customerIdx = i; hasHeader = true; }
@@ -265,6 +285,52 @@ export const JobManagement: React.FC<JobManagementProps> = ({
       const dataRows = hasHeader ? lines.slice(1) : lines;
       const parsedJobs: Partial<Job>[] = [];
 
+      let currentTeamsState = [...(teams || [])];
+      let teamsWereModified = false;
+
+      const matchOrAddTech = (rawName: string): string | null => {
+        const cleanName = rawName.replace(/^ช่าง/, '').trim();
+        if (!cleanName) return null;
+
+        // Search in existing teams
+        const allMembers = currentTeamsState.flatMap(t => t.members || []);
+        let found = allMembers.find(
+          m => m.name.trim() === rawName.trim() || m.name.replace(/^ช่าง/, '').trim() === cleanName
+        );
+
+        if (!found && cleanName.length >= 2) {
+          found = allMembers.find(m => {
+            const mClean = m.name.replace(/^ช่าง/, '').trim();
+            return mClean.includes(cleanName) || cleanName.includes(mClean);
+          });
+        }
+
+        if (found) return found.id;
+
+        // Auto-create missing technician and add to first team
+        teamsWereModified = true;
+        const newTechId = `m-imp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        const fullTechName = rawName.trim().startsWith('ช่าง') ? rawName.trim() : `ช่าง${rawName.trim()}`;
+        const newMember = { id: newTechId, name: fullTechName, joinDate: '2020-01-01' };
+
+        if (currentTeamsState.length > 0) {
+          currentTeamsState = currentTeamsState.map((t, idx) => {
+            if (idx === 0) {
+              return { ...t, members: [...(t.members || []), newMember] };
+            }
+            return t;
+          });
+        } else {
+          currentTeamsState = [{
+            id: 't-imp-1',
+            name: 'ทีมช่างทั่วไป',
+            members: [newMember]
+          }];
+        }
+
+        return newTechId;
+      };
+
       dataRows.forEach(row => {
         if (!row || row.length < 2) return;
         const rawDate = row[dateIdx] || '';
@@ -280,8 +346,16 @@ export const JobManagement: React.FC<JobManagementProps> = ({
         const type = matchJobType(row[typeIdx] || '');
         const rails = parseFloat(row[railsIdx]) || 0;
 
-        const techText = (row[techListIdx] || '') + ' ' + (row[teamListIdx] || '');
-        const selectedTechs = matchTechnicians(techText, teams);
+        const rawTechText = (row[techListIdx] || '') + ' ' + (row[teamListIdx] || '');
+        const techParts = rawTechText.split(/[,/+]|\s+และ\s+/).map(s => s.trim()).filter(Boolean);
+        const selectedTechs: string[] = [];
+
+        techParts.forEach(part => {
+          const tid = matchOrAddTech(part);
+          if (tid && !selectedTechs.includes(tid)) {
+            selectedTechs.push(tid);
+          }
+        });
 
         const rawChecked = (row[checkedIdx] || '').trim();
         const isChecked = rawChecked === 'ตรวจแล้ว' || rawChecked === 'ตรวจสอบแล้ว' || rawChecked === 'true';
@@ -299,10 +373,15 @@ export const JobManagement: React.FC<JobManagementProps> = ({
         });
       });
 
+      if (teamsWereModified) {
+        setPendingUpdatedTeams(currentTeamsState);
+      } else {
+        setPendingUpdatedTeams(null);
+      }
+
       setImportPreviewJobs(parsedJobs);
       setShowImportModal(true);
 
-      // Reset file input
       if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
@@ -311,11 +390,12 @@ export const JobManagement: React.FC<JobManagementProps> = ({
 
   const handleConfirmImport = () => {
     if (importPreviewJobs.length > 0 && onBatchAddJobs) {
-      onBatchAddJobs(importPreviewJobs);
+      onBatchAddJobs(importPreviewJobs, pendingUpdatedTeams || undefined);
     }
     setShowImportModal(false);
     setImportPreviewJobs([]);
     setImportFileName('');
+    setPendingUpdatedTeams(null);
   };
 
   const filteredJobs = jobs.filter(j => {
@@ -343,7 +423,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
         {/* Controls */}
         <div className="flex flex-wrap items-center gap-2 flex-1 max-w-2xl justify-end">
           {/* Search Box */}
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
             <input
               type="text"
@@ -372,41 +452,43 @@ export const JobManagement: React.FC<JobManagementProps> = ({
             <option value="asc">เรียง: เก่าสุดขึ้นก่อน</option>
           </select>
 
-          {/* CSV Import & Export */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            accept=".csv,text/csv"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
-            title="นำเข้าข้อมูลงานจากไฟล์ CSV"
-          >
-            <Upload size={14} />
-            <span>นำเข้า CSV</span>
-          </button>
+          {/* Action Buttons Group on the same line */}
+          <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".csv,text/csv"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+              title="นำเข้าข้อมูลงานจากไฟล์ CSV"
+            >
+              <Upload size={14} />
+              <span>นำเข้า CSV</span>
+            </button>
 
-          <button
-            onClick={onExportCSV}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
-            title="ส่งออกรายการงานเป็นไฟล์ CSV"
-          >
-            <FileSpreadsheet size={14} />
-            <span>ส่งออก CSV</span>
-          </button>
+            <button
+              onClick={onExportCSV}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+              title="ส่งออกรายการงานเป็นไฟล์ CSV"
+            >
+              <FileSpreadsheet size={14} />
+              <span>ส่งออก CSV</span>
+            </button>
 
-          {/* Add Job button */}
-          <button
-            onClick={() => setShowAddModal(true)}
-            style={{ backgroundColor: themeColor, color: themeTextColor }}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:opacity-90 transition-opacity"
-          >
-            <Plus size={15} />
-            <span>เพิ่มงานใหม่</span>
-          </button>
+            {/* Add Job button */}
+            <button
+              onClick={() => setShowAddModal(true)}
+              style={{ backgroundColor: themeColor, color: themeTextColor }}
+              className="px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:opacity-90 transition-opacity"
+            >
+              <Plus size={15} />
+              <span>เพิ่มงานใหม่</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -895,15 +977,18 @@ export const JobManagement: React.FC<JobManagementProps> = ({
                         <th className="p-2.5 w-28">ประเภทงาน</th>
                         <th className="p-2.5 text-center w-16">จำนวน</th>
                         <th className="p-2.5">ทีมช่างที่แมตช์ได้</th>
+                        <th className="p-2.5 text-right w-24">ค่า Incentive</th>
                         <th className="p-2.5 text-center w-20">สถานะ</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
                       {importPreviewJobs.map((job, idx) => {
                         const typeInfo = JOB_TYPES.find(t => t.id === job.type);
-                        const matchedMembers = (teams || [])
+                        const currentTeamsForLookup = pendingUpdatedTeams || teams || [];
+                        const matchedMembers = currentTeamsForLookup
                           .flatMap(t => t.members || [])
                           .filter(m => (job.selectedTechs || []).includes(m.id));
+                        const estIncentive = computeIncentiveForPreview(job, matchedMembers.length);
 
                         return (
                           <tr key={idx} className="hover:bg-blue-50/40">
@@ -934,6 +1019,9 @@ export const JobManagement: React.FC<JobManagementProps> = ({
                                   ยังไม่ได้แมตช์ช่าง
                                 </span>
                               )}
+                            </td>
+                            <td className="p-2.5 text-right font-black text-emerald-700">
+                              ฿{estIncentive.toLocaleString()}
                             </td>
                             <td className="p-2.5 text-center">
                               {job.isChecked ? (

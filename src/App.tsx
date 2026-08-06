@@ -174,8 +174,13 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = subscribeToRealtimeData((data) => {
       isRemoteUpdateRef.current = true;
-      if (data.jobs && Array.isArray(data.jobs)) setJobs(data.jobs);
-      if (data.teams && Array.isArray(data.teams)) setTeams(data.teams);
+
+      if (data.jobs && Array.isArray(data.jobs)) {
+        setJobs(data.jobs);
+      }
+      if (data.teams && Array.isArray(data.teams)) {
+        setTeams(data.teams);
+      }
       if (data.leaves && Array.isArray(data.leaves)) setLeaves(data.leaves);
       if (data.holidays && Array.isArray(data.holidays)) setHolidays(data.holidays);
       if (data.period && data.period.start) setPeriod(data.period);
@@ -203,7 +208,6 @@ export default function App() {
   }, [currentUser]);
 
   useEffect(() => {
-    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}app_users`, JSON.stringify(appUsers));
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ appUsers });
@@ -211,7 +215,6 @@ export default function App() {
   }, [appUsers]);
 
   useEffect(() => {
-    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}period`, JSON.stringify(period));
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ period });
@@ -219,7 +222,6 @@ export default function App() {
   }, [period]);
 
   useEffect(() => {
-    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}saved_periods`, JSON.stringify(savedPeriods));
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ savedPeriods });
@@ -227,7 +229,6 @@ export default function App() {
   }, [savedPeriods]);
 
   useEffect(() => {
-    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}teams`, JSON.stringify(teams));
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ teams });
@@ -235,7 +236,6 @@ export default function App() {
   }, [teams]);
 
   useEffect(() => {
-    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}jobs`, JSON.stringify(jobs));
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ jobs });
@@ -243,7 +243,6 @@ export default function App() {
   }, [jobs]);
 
   useEffect(() => {
-    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}leaves`, JSON.stringify(leaves));
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ leaves });
@@ -251,7 +250,6 @@ export default function App() {
   }, [leaves]);
 
   useEffect(() => {
-    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}holidays`, JSON.stringify(holidays));
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ holidays });
@@ -259,7 +257,6 @@ export default function App() {
   }, [holidays]);
 
   useEffect(() => {
-    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}theme_color`, themeColor);
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ themeColor });
@@ -267,7 +264,6 @@ export default function App() {
   }, [themeColor]);
 
   useEffect(() => {
-    if (!hasLoadedFromRemoteRef.current) return;
     localStorage.setItem(`${APP_KEY_PREFIX}rules`, JSON.stringify(rules));
     if (!isRemoteUpdateRef.current) {
       saveToRealtimeDb({ rules });
@@ -410,7 +406,10 @@ export default function App() {
     showNotification('เพิ่มงานติดตั้งใหม่สำเร็จ');
   };
 
-  const handleBatchAddJobs = (importedJobsData: Partial<Job>[]) => {
+  const handleBatchAddJobs = (importedJobsData: Partial<Job>[], updatedTeams?: Team[]) => {
+    if (updatedTeams && updatedTeams.length > 0) {
+      setTeams(updatedTeams);
+    }
     if (!importedJobsData || importedJobsData.length === 0) return;
     const baseTime = Date.now();
     const newJobs: Job[] = importedJobsData.map((data, idx) => {
@@ -892,6 +891,7 @@ export default function App() {
             jobs={jobs}
             teams={teams}
             leaves={leaves}
+            rules={rules}
             onAddJob={handleAddJob}
             onBatchAddJobs={handleBatchAddJobs}
             onUpdateJob={handleUpdateJob}

@@ -70,40 +70,41 @@ export const INITIAL_TEAMS: Team[] = [
     id: 't-1',
     name: 'ทีมช่างนาย',
     members: [
-      { id: 'm1', name: 'ช่างนาย', joinDate: '2024-01-01' },
-      { id: 'm2', name: 'ช่างอาท', joinDate: '2024-01-01' },
-      { id: 'm3', name: 'ช่างลิด', joinDate: '2024-01-01' }
+      { id: 'm1', name: 'ช่างนาย', joinDate: '2020-01-01' },
+      { id: 'm2', name: 'ช่างอาท', joinDate: '2020-01-01' },
+      { id: 'm3', name: 'ช่างลิด', joinDate: '2020-01-01' },
+      { id: 'm11', name: 'ช่างเซฟ', joinDate: '2020-01-01' }
     ]
   },
   {
     id: 't-2',
     name: 'ทีมช่างเบนซ์',
     members: [
-      { id: 'm4', name: 'ช่างเบนซ์', joinDate: '2024-01-01' },
-      { id: 'm5', name: 'ช่างกี้', joinDate: '2024-01-01' }
+      { id: 'm4', name: 'ช่างเบนซ์', joinDate: '2020-01-01' },
+      { id: 'm5', name: 'ช่างกี้', joinDate: '2020-01-01' }
     ]
   },
   {
     id: 't-3',
     name: 'ทีมช่างอั้ม',
     members: [
-      { id: 'm6', name: 'ช่างอั้ม', joinDate: '2024-01-01' },
-      { id: 'm7', name: 'ช่างต้อม', joinDate: '2024-01-01' },
-      { id: 'm8', name: 'ช่างทัด', joinDate: '2024-01-01' }
+      { id: 'm6', name: 'ช่างอั้ม', joinDate: '2020-01-01' },
+      { id: 'm7', name: 'ช่างต้อม', joinDate: '2020-01-01' },
+      { id: 'm8', name: 'ช่างทัด', joinDate: '2020-01-01' }
     ]
   },
   {
     id: 't-4',
     name: 'ทีมตัววิ่ง',
     members: [
-      { id: 'm9', name: 'ช่างเวียร์', joinDate: '2024-01-01' }
+      { id: 'm9', name: 'ช่างเวียร์', joinDate: '2020-01-01' }
     ]
   },
   {
     id: 't-5',
     name: 'ทีมวัดพื้นที่',
     members: [
-      { id: 'm10', name: 'ช่างเอก', joinDate: '2024-01-01' }
+      { id: 'm10', name: 'ช่างเอก', joinDate: '2020-01-01' }
     ]
   }
 ];
