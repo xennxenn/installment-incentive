@@ -5,7 +5,7 @@
     body {
       background-color: #ffffff !important;
       color: #000000 !important;
-      font-size: 10pt !important;
+      font-size: 9pt !important;
       font-family: 'Sarabun', 'Prompt', system-ui, -apple-system, sans-serif !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
@@ -31,7 +31,7 @@
 
     @page {
       size: A4 portrait;
-      margin: 10mm 12mm 15mm 12mm;
+      margin: 8mm 8mm 10mm 8mm;
     }
 
     table {
@@ -53,20 +53,28 @@
       display: table-footer-group !important;
     }
 
-    th, td {
-      border: 1px solid #475569 !important;
-      padding: 5px 8px !important;
-      font-size: 9pt !important;
-      color: #000000 !important;
+    .report-table th, 
+    .report-table td {
+      border: 1px solid #cbd5e1 !important;
+      padding: 4px 6px !important;
+      font-size: 8.5pt !important;
+      line-height: 1.25 !important;
+      color: #0f172a !important;
     }
 
-    .print-header-cell, .print-header-cell * {
+    .print-header-row td {
       border: none !important;
+      padding: 0 0 6px 0 !important;
     }
 
-    th {
-      background-color: #ffffff !important;
+    .print-bordered-box {
+      border: 1px solid #cbd5e1 !important;
+    }
+
+    .report-table th {
+      background-color: #f8fafc !important;
       font-weight: 700 !important;
+      color: #0f172a !important;
     }
 
     .print-signature-block {

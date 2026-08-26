@@ -107,7 +107,7 @@ export const Reports: React.FC<ReportsProps> = ({
       </div>
 
       {/* Official Printed Document Area */}
-      <div className="p-6 md:p-8 bg-white">
+      <div className="p-4 md:p-6 bg-white">
         {/* Team Report View */}
         {reportType === 'team' && (
           <div>
@@ -115,15 +115,15 @@ export const Reports: React.FC<ReportsProps> = ({
               <div>
                 {/* Formal Table */}
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse border border-gray-300">
+                  <table className="report-table w-full text-left text-xs border-collapse border border-gray-300">
                     <thead>
                       {/* Formal Corporate Header Block & Metrics Header (Repeats on every printed page) */}
                       <tr className="print-header-row">
-                        <td colSpan={10} className="print-header-cell border-none p-0 pb-2">
-                          <div className="border-b-2 border-gray-900 pb-2.5 mb-2.5">
-                            <div className="flex flex-wrap justify-between items-start gap-3">
+                        <td colSpan={10} className="border-none p-0 pb-2">
+                          <div className="border-b-2 border-gray-900 pb-2 mb-2">
+                            <div className="flex flex-wrap justify-between items-start gap-2">
                               <div className="flex items-start gap-3">
-                                <img src={LOGO_URL} alt="PASAYA" className="h-[52px] w-auto object-contain flex-shrink-0" />
+                                <img src={LOGO_URL} alt="PASAYA" className="h-[48px] w-auto object-contain flex-shrink-0" />
                                 <div className="text-xs text-gray-900 space-y-0.5 leading-tight">
                                   <h2 className="font-extrabold text-xs md:text-sm text-gray-900 tracking-tight leading-tight">
                                     บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
@@ -137,14 +137,14 @@ export const Reports: React.FC<ReportsProps> = ({
                                 </div>
                               </div>
                               <div className="text-right text-[11px] leading-tight">
-                                <div className="inline-block border border-gray-300 rounded-lg p-1.5 px-2.5 bg-white text-left shadow-2xs space-y-0.5">
+                                <div className="print-bordered-box inline-block border border-gray-300 rounded p-1.5 px-2.5 bg-white text-left shadow-2xs space-y-0.5">
                                   <div><strong className="text-gray-900">เลขที่เอกสาร:</strong> INC-TM-{(period?.id || '2026').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}-{selectedTeamId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}</div>
                                   <div><strong className="text-gray-900">วันที่ออกเอกสาร:</strong> {issueDateStr}</div>
                                 </div>
                               </div>
                             </div>
 
-                            <div className="text-center mt-2.5 space-y-0.5">
+                            <div className="text-center mt-2 space-y-0.5">
                               <h1 className="font-black text-base text-gray-900 tracking-tight leading-tight">
                                 เอกสารใบแจ้งรายละเอียดสวัสดิการค่าตอบแทนพิเศษ (สรุปรายทีม)
                               </h1>
@@ -154,8 +154,8 @@ export const Reports: React.FC<ReportsProps> = ({
                             </div>
                           </div>
 
-                          {/* Team Info Metrics Header */}
-                          <div className="grid grid-cols-3 gap-2 mb-2 p-2 bg-white border border-gray-300 rounded-lg text-xs font-normal leading-tight">
+                          {/* Team Info Metrics Header Box */}
+                          <div className="print-bordered-box grid grid-cols-3 gap-2 mb-2 p-2 bg-white border border-gray-300 rounded text-xs font-normal leading-tight">
                             <div>
                               <span className="text-gray-600 block text-[11px]">ทีมช่างปฏิบัติงาน:</span>
                               <strong className="text-xs md:text-sm text-gray-900 font-bold">{calcData.reportTeamLogs[selectedTeamId]?.name || ''}</strong>
@@ -182,42 +182,48 @@ export const Reports: React.FC<ReportsProps> = ({
                       </tr>
 
                       {/* Column Headers */}
-                      <tr className="bg-white text-gray-900 font-bold border-b border-gray-300">
-                        <th className="border border-gray-300 p-2 text-center w-10">ลำดับ</th>
-                        <th className="border border-gray-300 p-2">วันที่</th>
-                        <th className="border border-gray-300 p-2 text-center">เวลา</th>
-                        <th className="border border-gray-300 p-2">ประเภทงาน</th>
-                        <th className="border border-gray-300 p-2">ชื่อลูกค้า / งาน</th>
-                        <th className="border border-gray-300 p-2">สถานที่ติดตั้ง</th>
-                        <th className="border border-gray-300 p-2 text-center">ปริมาณ (ราง/ตร.ม.)</th>
-                        <th className="border border-gray-300 p-2 text-center">จำนวนช่าง</th>
-                        <th className="border border-gray-300 p-2 text-center">หมายเหตุ</th>
-                        <th className="border border-gray-300 p-2 text-right">Incentive ทีม (บาท)</th>
+                      <tr className="bg-gray-50 text-gray-900 font-bold border-b border-gray-300">
+                        <th className="border border-gray-300 py-1.5 px-2 text-center w-10">ลำดับ</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-center w-20">วันที่</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-center w-24">เวลา</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-left w-24">ประเภทงาน</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-left">ชื่อลูกค้า / งาน</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-left w-28">สถานที่ติดตั้ง</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-center w-24">ปริมาณ (ราง/ตร.ม.)</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-center w-20">จำนวนช่าง</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-center w-24">สถานะ/หมายเหตุ</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-right w-36">Incentive ทีม (บาท)</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-gray-200">
                       {calcData.reportTeamLogs[selectedTeamId].rows.map((row, rIdx) => (
                         <tr
                           key={rIdx}
-                          className={row.isHoliday ? 'bg-white text-gray-500 italic' : 'bg-white'}
+                          className={row.isHoliday ? 'bg-white text-gray-500' : 'bg-white hover:bg-gray-50/50'}
                         >
-                          <td className="border border-gray-300 p-2 text-center text-gray-500 font-medium">{rIdx + 1}</td>
-                          <td className="border border-gray-300 p-2 whitespace-nowrap font-medium text-gray-900">{formatDateTH(row.date)}</td>
+                          <td className="border border-gray-300 py-1.5 px-2 text-center text-gray-600 font-medium">{rIdx + 1}</td>
+                          <td className="border border-gray-300 py-1.5 px-2 text-center whitespace-nowrap font-medium text-gray-900">{formatDateTH(row.date)}</td>
                           {row.isHoliday ? (
-                            <td colSpan={8} className="border border-gray-300 p-2 text-center font-bold text-red-600 bg-white">
+                            <td colSpan={8} className="border border-gray-300 py-1.5 px-2 text-center font-bold text-red-600 bg-white">
                               วันหยุดบริษัท
                             </td>
                           ) : (
                             <>
-                              <td className="border border-gray-300 p-2 text-center text-gray-600">{row.time}</td>
-                              <td className="border border-gray-300 p-2 font-semibold text-gray-800">{row.type}</td>
-                              <td className="border border-gray-300 p-2 font-medium text-gray-900">{row.customer}</td>
-                              <td className="border border-gray-300 p-2 text-gray-600">{row.location}</td>
-                              <td className="border border-gray-300 p-2 text-center font-bold text-gray-900">{row.rails}</td>
-                              <td className="border border-gray-300 p-2 text-center font-bold text-gray-900">{row.techs}</td>
-                              <td className="border border-gray-300 p-2 text-center text-[10px] text-gray-500">{row.note || '-'}</td>
-                              <td className="border border-gray-300 p-2 text-right font-black text-gray-900">
-                                {row.inc !== '-' ? `฿${Number(row.inc).toLocaleString()}` : '-'}
+                              <td className="border border-gray-300 py-1.5 px-2 text-center text-gray-700">{row.time}</td>
+                              <td className="border border-gray-300 py-1.5 px-2 font-semibold text-gray-900">{row.type}</td>
+                              <td className="border border-gray-300 py-1.5 px-2 font-medium text-gray-900">{row.customer}</td>
+                              <td className="border border-gray-300 py-1.5 px-2 text-gray-700">{row.location}</td>
+                              <td className="border border-gray-300 py-1.5 px-2 text-center font-bold text-gray-900">
+                                {typeof row.rails === 'number' ? (row.rails % 1 === 0 ? row.rails : Number(row.rails.toFixed(2))) : row.rails || '-'}
+                              </td>
+                              <td className="border border-gray-300 py-1.5 px-2 text-center font-bold text-gray-900">{row.techs}</td>
+                              <td className="border border-gray-300 py-1.5 px-2 text-center text-[11px] text-gray-500">{row.note || '-'}</td>
+                              <td className="border border-gray-300 py-1.5 px-2 text-right font-bold text-gray-900">
+                                {typeof row.inc === 'number'
+                                  ? `฿${row.inc % 1 === 0 ? row.inc.toLocaleString() : Number(row.inc.toFixed(3)).toLocaleString()}`
+                                  : row.inc !== '-'
+                                  ? `฿${row.inc}`
+                                  : '-'}
                               </td>
                             </>
                           )}
@@ -232,20 +238,20 @@ export const Reports: React.FC<ReportsProps> = ({
                         </tr>
                       )}
                     </tbody>
-                    <tfoot className="bg-white font-bold border-t-2 border-gray-400">
+                    <tfoot className="bg-gray-50 font-bold border-t-2 border-gray-400">
                       <tr>
-                        <td colSpan={6} className="border border-gray-300 p-2.5 text-right font-black text-gray-900">
+                        <td colSpan={6} className="border border-gray-300 py-2 px-2.5 text-right font-black text-gray-900">
                           รวมสรุปผลงานทีมประจำรอบ:
                         </td>
-                        <td className="border border-gray-300 p-2.5 text-center text-blue-800 font-black">
+                        <td className="border border-gray-300 py-2 px-2.5 text-center text-blue-900 font-black">
                           {Number(
                             calcData.reportTeamLogs[selectedTeamId].rows
                               .reduce((sum, r) => sum + (typeof r.rails === 'number' ? r.rails : 0), 0)
-                              .toFixed(1)
+                              .toFixed(2)
                           )}
                         </td>
-                        <td className="border border-gray-300 p-2.5" colSpan={2}></td>
-                        <td className="border border-gray-300 p-2.5 text-right text-emerald-800 font-black text-sm">
+                        <td className="border border-gray-300 py-2 px-2.5" colSpan={2}></td>
+                        <td className="border border-gray-300 py-2 px-2.5 text-right text-emerald-800 font-black text-sm">
                           ฿
                           {Math.round(
                             calcData.reportTeamLogs[selectedTeamId].rows.reduce(
@@ -260,11 +266,11 @@ export const Reports: React.FC<ReportsProps> = ({
                 </div>
 
                 {/* Official Sign-off Approval Block */}
-                <div className="mt-12 pt-6 border-t border-gray-300 text-xs text-gray-800 break-inside-avoid">
-                  <div className="font-bold text-center mb-6 text-gray-900 text-xs tracking-wider uppercase">
+                <div className="mt-8 pt-4 border-t border-gray-300 text-xs text-gray-800 print-signature-block">
+                  <div className="font-bold text-center mb-4 text-gray-900 text-xs tracking-wider uppercase">
                     ช่องทางลงนามอนุมัติเอกสาร (OFFICIAL APPROVAL SIGN-OFF)
                   </div>
-                  <div className="grid grid-cols-3 gap-6 text-center">
+                  <div className="grid grid-cols-3 gap-4 text-center">
                     <div>
                       <div className="border-b border-dashed border-gray-400 w-4/5 mx-auto mb-2"></div>
                       <p className="font-bold text-gray-900">(........................................................)</p>
@@ -301,15 +307,15 @@ export const Reports: React.FC<ReportsProps> = ({
               <div>
                 {/* Formal Table */}
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse border border-gray-300">
+                  <table className="report-table w-full text-left text-xs border-collapse border border-gray-300">
                     <thead>
                       {/* Formal Corporate Header Block & Individual Info Box (Repeats on every printed page) */}
                       <tr className="print-header-row">
-                        <td colSpan={10} className="print-header-cell border-none p-0 pb-2">
-                          <div className="border-b-2 border-gray-900 pb-2.5 mb-2.5">
-                            <div className="flex flex-wrap justify-between items-start gap-3">
+                        <td colSpan={10} className="border-none p-0 pb-2">
+                          <div className="border-b-2 border-gray-900 pb-2 mb-2">
+                            <div className="flex flex-wrap justify-between items-start gap-2">
                               <div className="flex items-start gap-3">
-                                <img src={LOGO_URL} alt="PASAYA" className="h-[52px] w-auto object-contain flex-shrink-0" />
+                                <img src={LOGO_URL} alt="PASAYA" className="h-[48px] w-auto object-contain flex-shrink-0" />
                                 <div className="text-xs text-gray-900 space-y-0.5 leading-tight">
                                   <h2 className="font-extrabold text-xs md:text-sm text-gray-900 tracking-tight leading-tight">
                                     บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
@@ -323,14 +329,14 @@ export const Reports: React.FC<ReportsProps> = ({
                                 </div>
                               </div>
                               <div className="text-right text-[11px] leading-tight">
-                                <div className="inline-block border border-gray-300 rounded-lg p-1.5 px-2.5 bg-white text-left shadow-2xs space-y-0.5">
+                                <div className="print-bordered-box inline-block border border-gray-300 rounded p-1.5 px-2.5 bg-white text-left shadow-2xs space-y-0.5">
                                   <div><strong className="text-gray-900">เลขที่เอกสาร:</strong> INC-TC-{(period?.id || '2026').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}-{selectedTechId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}</div>
                                   <div><strong className="text-gray-900">วันที่ออกเอกสาร:</strong> {issueDateStr}</div>
                                 </div>
                               </div>
                             </div>
 
-                            <div className="text-center mt-2.5 space-y-0.5">
+                            <div className="text-center mt-2 space-y-0.5">
                               <h1 className="font-black text-base text-gray-900 tracking-tight leading-tight">
                                 เอกสารใบแจ้งรายละเอียดสวัสดิการค่าตอบแทนพิเศษ
                               </h1>
@@ -341,7 +347,7 @@ export const Reports: React.FC<ReportsProps> = ({
                           </div>
 
                           {/* Individual Info Box */}
-                          <div className="grid grid-cols-3 gap-2 mb-2 p-2 bg-white border border-gray-300 rounded-lg text-xs font-normal leading-tight">
+                          <div className="print-bordered-box grid grid-cols-3 gap-2 mb-2 p-2 bg-white border border-gray-300 rounded text-xs font-normal leading-tight">
                             <div>
                               <span className="text-gray-600 block text-[11px]">ชื่อ-นามสกุล ช่าง:</span>
                               <strong className="text-xs md:text-sm text-gray-900 font-bold">{calcData.reportTechLogs[selectedTechId]?.name || ''}</strong>
@@ -366,20 +372,20 @@ export const Reports: React.FC<ReportsProps> = ({
                       </tr>
 
                       {/* Column Headers */}
-                      <tr className="bg-white text-gray-900 font-bold border-b border-gray-300">
-                        <th className="border border-gray-300 p-2 text-center w-10">ลำดับ</th>
-                        <th className="border border-gray-300 p-2">วันที่</th>
-                        <th className="border border-gray-300 p-2 text-center">เวลา</th>
-                        <th className="border border-gray-300 p-2">ประเภทงาน</th>
-                        <th className="border border-gray-300 p-2">ชื่อลูกค้า / งาน</th>
-                        <th className="border border-gray-300 p-2">สถานที่ติดตั้ง</th>
-                        <th className="border border-gray-300 p-2 text-center">ส่วนแบ่ง (ราง/ตร.ม.)</th>
-                        <th className="border border-gray-300 p-2 text-center">จำนวนช่างทีม</th>
-                        <th className="border border-gray-300 p-2 text-center">สถานะ/หมายเหตุ</th>
-                        <th className="border border-gray-300 p-2 text-right">Incentive ส่วนบุคคล (บาท)</th>
+                      <tr className="bg-gray-50 text-gray-900 font-bold border-b border-gray-300">
+                        <th className="border border-gray-300 py-1.5 px-2 text-center w-10">ลำดับ</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-center w-20">วันที่</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-center w-24">เวลา</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-left w-24">ประเภทงาน</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-left">ชื่อลูกค้า / งาน</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-left w-28">สถานที่ติดตั้ง</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-center w-24">ส่วนแบ่ง (ราง/ตร.ม.)</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-center w-20">จำนวนช่างทีม</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-center w-24">สถานะ/หมายเหตุ</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-right w-36">Incentive ส่วนบุคคล (บาท)</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-gray-200">
                       {calcData.reportTechLogs[selectedTechId].rows.map((row, rIdx) => (
                         <tr
                           key={rIdx}
@@ -388,33 +394,37 @@ export const Reports: React.FC<ReportsProps> = ({
                               ? 'bg-white text-gray-500'
                               : row.isLeave
                               ? 'bg-white text-amber-900'
-                              : 'bg-white'
+                              : 'bg-white hover:bg-gray-50/50'
                           }
                         >
-                          <td className="border border-gray-300 p-2 text-center text-gray-500 font-medium">{rIdx + 1}</td>
-                          <td className="border border-gray-300 p-2 whitespace-nowrap font-medium text-gray-900">{formatDateTH(row.date)}</td>
+                          <td className="border border-gray-300 py-1.5 px-2 text-center text-gray-600 font-medium">{rIdx + 1}</td>
+                          <td className="border border-gray-300 py-1.5 px-2 text-center whitespace-nowrap font-medium text-gray-900">{formatDateTH(row.date)}</td>
                           {row.isHoliday ? (
-                            <td colSpan={8} className="border border-gray-300 p-2 text-center font-bold text-red-600 bg-white">
+                            <td colSpan={8} className="border border-gray-300 py-1.5 px-2 text-center font-bold text-red-600 bg-white">
                               วันหยุดบริษัท
                             </td>
                           ) : row.isLeave ? (
-                            <td colSpan={8} className="border border-gray-300 p-2 text-center font-bold text-amber-800 bg-white">
+                            <td colSpan={8} className="border border-gray-300 py-1.5 px-2 text-center font-bold text-amber-800 bg-white">
                               {row.customer}
                             </td>
                           ) : (
                             <>
-                              <td className="border border-gray-300 p-2 text-center text-gray-600">{row.time}</td>
-                              <td className="border border-gray-300 p-2 font-semibold text-gray-800">{row.type}</td>
-                              <td className="border border-gray-300 p-2 font-medium text-gray-900">{row.customer}</td>
-                              <td className="border border-gray-300 p-2 text-gray-600">{row.location}</td>
-                              <td className="border border-gray-300 p-2 text-center font-bold text-gray-900">{row.rails}</td>
-                              <td className="border border-gray-300 p-2 text-center font-bold text-gray-900">{row.techs}</td>
-                              <td className="border border-gray-300 p-2 text-center text-[10px] text-gray-500">{row.note || '-'}</td>
-                              <td className="border border-gray-300 p-2 text-right font-black text-gray-900">
-                                {row.inc !== '-' && Number(row.inc) > 0
-                                  ? `฿${Number(row.inc).toLocaleString()}`
+                              <td className="border border-gray-300 py-1.5 px-2 text-center text-gray-700">{row.time}</td>
+                              <td className="border border-gray-300 py-1.5 px-2 font-semibold text-gray-900">{row.type}</td>
+                              <td className="border border-gray-300 py-1.5 px-2 font-medium text-gray-900">{row.customer}</td>
+                              <td className="border border-gray-300 py-1.5 px-2 text-gray-700">{row.location}</td>
+                              <td className="border border-gray-300 py-1.5 px-2 text-center font-bold text-gray-900">
+                                {typeof row.rails === 'number' ? (row.rails % 1 === 0 ? row.rails : Number(row.rails.toFixed(2))) : row.rails || '-'}
+                              </td>
+                              <td className="border border-gray-300 py-1.5 px-2 text-center font-bold text-gray-900">{row.techs}</td>
+                              <td className="border border-gray-300 py-1.5 px-2 text-center text-[11px] text-gray-500">{row.note || '-'}</td>
+                              <td className="border border-gray-300 py-1.5 px-2 text-right font-bold text-gray-900">
+                                {typeof row.inc === 'number' && row.inc > 0
+                                  ? `฿${row.inc % 1 === 0 ? row.inc.toLocaleString() : Number(row.inc.toFixed(3)).toLocaleString()}`
                                   : row.inc === 0
                                   ? '฿0 (ไม่เข้าเกณฑ์/วันลา)'
+                                  : row.inc !== '-'
+                                  ? `฿${row.inc}`
                                   : '-'}
                               </td>
                             </>
@@ -430,20 +440,20 @@ export const Reports: React.FC<ReportsProps> = ({
                         </tr>
                       )}
                     </tbody>
-                    <tfoot className="bg-white font-bold border-t-2 border-gray-400">
+                    <tfoot className="bg-gray-50 font-bold border-t-2 border-gray-400">
                       <tr>
-                        <td colSpan={6} className="border border-gray-300 p-2.5 text-right font-black text-gray-900">
+                        <td colSpan={6} className="border border-gray-300 py-2 px-2.5 text-right font-black text-gray-900">
                           รวมค่า Incentive สุทธิส่วนบุคคล:
                         </td>
-                        <td className="border border-gray-300 p-2.5 text-center text-blue-800 font-black">
+                        <td className="border border-gray-300 py-2 px-2.5 text-center text-blue-900 font-black">
                           {Number(
                             calcData.reportTechLogs[selectedTechId].rows
                               .reduce((sum, r) => sum + (typeof r.rails === 'number' ? r.rails : 0), 0)
-                              .toFixed(1)
+                              .toFixed(2)
                           )}
                         </td>
-                        <td className="border border-gray-300 p-2.5" colSpan={2}></td>
-                        <td className="border border-gray-300 p-2.5 text-right text-emerald-800 font-black text-sm">
+                        <td className="border border-gray-300 py-2 px-2.5" colSpan={2}></td>
+                        <td className="border border-gray-300 py-2 px-2.5 text-right text-emerald-800 font-black text-sm">
                           ฿
                           {Math.round(
                             calcData.reportTechLogs[selectedTechId].rows.reduce(
@@ -458,8 +468,8 @@ export const Reports: React.FC<ReportsProps> = ({
                 </div>
 
                 {/* Official Sign-off Approval Block */}
-                <div className="mt-12 pt-6 border-t border-gray-300 text-xs text-gray-800 break-inside-avoid">
-                  <div className="font-bold text-center mb-6 text-gray-900 text-xs tracking-wider uppercase">
+                <div className="mt-8 pt-4 border-t border-gray-300 text-xs text-gray-800 print-signature-block">
+                  <div className="font-bold text-center mb-4 text-gray-900 text-xs tracking-wider uppercase">
                     ช่องทางลงนามและอนุมัติ (OFFICIAL SIGN-OFF & APPROVAL)
                   </div>
                   <div className="grid grid-cols-2 gap-8 text-center max-w-2xl mx-auto">
