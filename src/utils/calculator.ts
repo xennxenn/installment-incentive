@@ -93,7 +93,7 @@ export function calculateIncentives(
   leaves: LeaveRecord[],
   period: PayPeriod,
   rules: IncentiveRules,
-  jobSortOrder: 'asc' | 'desc' = 'desc'
+  jobSortOrder: 'asc' | 'desc' | 'manual' = 'manual'
 ): CalculationResult {
   const safePeriod = period && period.start && period.end ? period : { name: 'รอบปัจจุบัน', start: '2026-01-01', end: '2026-12-31' };
   const safeTeams = (teams || []).filter(Boolean);
@@ -106,18 +106,21 @@ export function calculateIncentives(
 
   // Sorting
   periodJobs.sort((a, b) => {
-    const dateA = a.date || '';
-    const dateB = b.date || '';
-    const timeA = a.timeSlot || '';
-    const timeB = b.timeSlot || '';
     if (jobSortOrder === 'desc') {
-      const dateDiff = dateB.localeCompare(dateA);
+      const dateDiff = (b.date || '').localeCompare(a.date || '');
       if (dateDiff !== 0) return dateDiff;
-      return timeB.localeCompare(timeA);
+      const timeDiff = (b.timeSlot || '').localeCompare(a.timeSlot || '');
+      if (timeDiff !== 0) return timeDiff;
+      return (b.orderIndex || 0) - (a.orderIndex || 0);
+    } else if (jobSortOrder === 'asc') {
+      const dateDiff = (a.date || '').localeCompare(b.date || '');
+      if (dateDiff !== 0) return dateDiff;
+      const timeDiff = (a.timeSlot || '').localeCompare(b.timeSlot || '');
+      if (timeDiff !== 0) return timeDiff;
+      return (a.orderIndex || 0) - (b.orderIndex || 0);
     } else {
-      const dateDiff = dateA.localeCompare(dateB);
-      if (dateDiff !== 0) return dateDiff;
-      return timeA.localeCompare(timeB);
+      // 'manual' order: strictly respect orderIndex
+      return (b.orderIndex || 0) - (a.orderIndex || 0);
     }
   });
 

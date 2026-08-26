@@ -158,7 +158,7 @@ export default function App() {
   });
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [jobSortOrder, setJobSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [jobSortOrder, setJobSortOrder] = useState<'asc' | 'desc' | 'manual'>('manual');
   const [notification, setNotification] = useState<NotificationState | null>(null);
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(null);
   const [showRulesModal, setShowRulesModal] = useState<boolean>(false);
@@ -209,63 +209,63 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}app_users`, JSON.stringify(appUsers));
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ appUsers });
     }
   }, [appUsers]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}period`, JSON.stringify(period));
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ period });
     }
   }, [period]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}saved_periods`, JSON.stringify(savedPeriods));
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ savedPeriods });
     }
   }, [savedPeriods]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}teams`, JSON.stringify(teams));
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ teams });
     }
   }, [teams]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}jobs`, JSON.stringify(jobs));
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ jobs });
     }
   }, [jobs]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}leaves`, JSON.stringify(leaves));
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ leaves });
     }
   }, [leaves]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}holidays`, JSON.stringify(holidays));
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ holidays });
     }
   }, [holidays]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}theme_color`, themeColor);
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ themeColor });
     }
   }, [themeColor]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}rules`, JSON.stringify(rules));
-    if (!isRemoteUpdateRef.current) {
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
       saveToRealtimeDb({ rules });
     }
   }, [rules]);
@@ -389,8 +389,9 @@ export default function App() {
   // Jobs Handlers
   const handleAddJob = (jobData: Partial<Job>) => {
     const type = jobData.type || 'install';
+    const now = Date.now();
     const newJob: Job = {
-      id: `job-${Date.now()}`,
+      id: `job-${now}-${Math.random().toString(36).substring(2, 6)}`,
       date: jobData.date || safePeriod.start,
       timeSlot: jobData.timeSlot || '10.00 - 11.30',
       orderNo: (jobData.orderNo || '').trim().toUpperCase(),
@@ -400,7 +401,7 @@ export default function App() {
       rails: formatQuantity(type, jobData.rails || 0),
       selectedTechs: jobData.selectedTechs || [],
       isChecked: false,
-      orderIndex: Date.now()
+      orderIndex: now + 1000000
     };
     setJobs(prev => [newJob, ...prev]);
     showNotification('เพิ่มงานติดตั้งใหม่สำเร็จ');
@@ -412,11 +413,13 @@ export default function App() {
     }
     if (!importedJobsData || importedJobsData.length === 0) return;
     const baseTime = Date.now();
+    const total = importedJobsData.length;
+    // Row 0 in CSV gets the highest orderIndex so it appears at the very top, row 1 next, row 2 next, etc.
     const newJobs: Job[] = importedJobsData.map((data, idx) => {
       const type = data.type || 'install';
-      const timestamp = baseTime + idx;
+      const orderIndex = baseTime + (total - idx) * 100;
       return {
-        id: `job-${timestamp}-${Math.random().toString(36).substring(2, 6)}`,
+        id: `job-${baseTime}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
         date: data.date || safePeriod.start,
         timeSlot: data.timeSlot || '10.00 - 11.30',
         orderNo: (data.orderNo || '').trim().toUpperCase() || '-',
@@ -426,11 +429,18 @@ export default function App() {
         rails: formatQuantity(type, data.rails || 0),
         selectedTechs: data.selectedTechs || [],
         isChecked: !!data.isChecked,
-        orderIndex: timestamp
+        orderIndex
       };
     });
 
-    setJobs(prev => [...newJobs, ...prev]);
+    setJobs(prev => {
+      const maxExisting = prev.reduce((max, j) => Math.max(max, j.orderIndex || 0), 0);
+      const shift = maxExisting >= baseTime ? maxExisting - baseTime + 1000 : 0;
+      const adjustedNewJobs = shift > 0
+        ? newJobs.map(j => ({ ...j, orderIndex: j.orderIndex + shift }))
+        : newJobs;
+      return [...adjustedNewJobs, ...prev];
+    });
     showNotification(`นำเข้าข้อมูลเรียบร้อยแล้ว ${newJobs.length} รายการ`);
   };
 
@@ -460,23 +470,33 @@ export default function App() {
   };
 
   const handleMoveJob = (id: string, direction: -1 | 1) => {
-    const idx = calcData.periodJobs.findIndex(j => j.id === id);
-    if (idx === -1 || idx + direction < 0 || idx + direction >= calcData.periodJobs.length) return;
+    setJobs(prev => {
+      // 1. Build an array of jobs ensuring each has a valid numeric orderIndex
+      const indexedList = prev.map((j, i) => ({
+        ...j,
+        orderIndex: typeof j.orderIndex === 'number' ? j.orderIndex : (prev.length - i) * 1000
+      }));
 
-    const j1 = calcData.periodJobs[idx];
-    const j2 = calcData.periodJobs[idx + direction];
+      // 2. Sort according to current orderIndex (descending)
+      indexedList.sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0));
 
-    let o1 = j1.orderIndex || Date.now();
-    let o2 = j2.orderIndex || Date.now() - 1000;
-    if (o1 === o2) o1 += 1;
+      const currentIndex = indexedList.findIndex(j => j.id === id);
+      if (currentIndex === -1) return prev;
 
-    setJobs(prev =>
-      prev.map(j => {
-        if (j.id === j1.id) return { ...j, orderIndex: o2 };
-        if (j.id === j2.id) return { ...j, orderIndex: o1 };
-        return j;
-      })
-    );
+      const targetIndex = currentIndex + direction;
+      if (targetIndex < 0 || targetIndex >= indexedList.length) return prev;
+
+      // 3. Swap the items in the indexedList
+      const temp = indexedList[currentIndex];
+      indexedList[currentIndex] = indexedList[targetIndex];
+      indexedList[targetIndex] = temp;
+
+      // 4. Re-assign clean, strictly decreasing orderIndex so order is locked and synced
+      return indexedList.map((j, i) => ({
+        ...j,
+        orderIndex: (indexedList.length - i) * 1000
+      }));
+    });
   };
 
   const handleToggleCheck = (id: string, currentStatus: boolean) => {

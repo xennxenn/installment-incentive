@@ -1,0 +1,27 @@
+{
+  "entities": {
+    "MainState": {
+      "title": "MainState",
+      "description": "Master synchronized state for curtain installation app",
+      "type": "object",
+      "properties": {
+        "teams": { "type": "array", "description": "Teams and technicians" },
+        "jobs": { "type": "array", "description": "Job installation records" },
+        "leaves": { "type": "array", "description": "Technician leave records" },
+        "holidays": { "type": "array", "description": "Company holidays" },
+        "period": { "type": "object", "description": "Active pay period" },
+        "savedPeriods": { "type": "array", "description": "Saved pay periods" },
+        "rules": { "type": "object", "description": "Incentive calculation rules" },
+        "appUsers": { "type": "array", "description": "System users" },
+        "themeColor": { "type": "string", "description": "Application theme color" },
+        "updatedAt": { "type": "number", "description": "Last updated timestamp" }
+      }
+    }
+  },
+  "firestore": {
+    "/curtain_installer/main_state": {
+      "schema": { "$ref": "#/entities/MainState" },
+      "description": "Master application state for real-time collaboration across all devices"
+    }
+  }
+}

@@ -23,8 +23,8 @@ interface JobManagementProps {
   themeTextColor: string;
   periodStart: string;
   periodEnd: string;
-  jobSortOrder: 'asc' | 'desc';
-  setJobSortOrder: (order: 'asc' | 'desc') => void;
+  jobSortOrder: 'asc' | 'desc' | 'manual';
+  setJobSortOrder: (order: 'asc' | 'desc' | 'manual') => void;
 }
 
 export const JobManagement: React.FC<JobManagementProps> = ({
@@ -399,17 +399,40 @@ export const JobManagement: React.FC<JobManagementProps> = ({
     setPendingUpdatedTeams(null);
   };
 
-  const filteredJobs = jobs.filter(j => {
-    const inPeriod = !filterByPeriod || !j.date || (j.date >= periodStart && j.date <= periodEnd);
-    const q = searchQuery.toLowerCase();
-    const matchesSearch =
-      !q ||
-      (j.customer || '').toLowerCase().includes(q) ||
-      (j.orderNo || '').toLowerCase().includes(q) ||
-      (j.location || '').toLowerCase().includes(q) ||
-      (j.date || '').includes(q);
-    return inPeriod && matchesSearch;
-  });
+  const displayJobs = React.useMemo(() => {
+    const list = jobs.filter(j => {
+      const inPeriod = !filterByPeriod || !j.date || (j.date >= periodStart && j.date <= periodEnd);
+      const q = searchQuery.toLowerCase();
+      const matchesSearch =
+        !q ||
+        (j.customer || '').toLowerCase().includes(q) ||
+        (j.orderNo || '').toLowerCase().includes(q) ||
+        (j.location || '').toLowerCase().includes(q) ||
+        (j.date || '').includes(q);
+      return inPeriod && matchesSearch;
+    });
+
+    if (jobSortOrder === 'desc') {
+      return [...list].sort((a, b) => {
+        const dateDiff = (b.date || '').localeCompare(a.date || '');
+        if (dateDiff !== 0) return dateDiff;
+        const timeDiff = (b.timeSlot || '').localeCompare(a.timeSlot || '');
+        if (timeDiff !== 0) return timeDiff;
+        return (b.orderIndex || 0) - (a.orderIndex || 0);
+      });
+    } else if (jobSortOrder === 'asc') {
+      return [...list].sort((a, b) => {
+        const dateDiff = (a.date || '').localeCompare(b.date || '');
+        if (dateDiff !== 0) return dateDiff;
+        const timeDiff = (a.timeSlot || '').localeCompare(b.timeSlot || '');
+        if (timeDiff !== 0) return timeDiff;
+        return (a.orderIndex || 0) - (b.orderIndex || 0);
+      });
+    } else {
+      // 'manual': strictly by orderIndex descending (Row 1 on top)
+      return [...list].sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0));
+    }
+  }, [jobs, filterByPeriod, periodStart, periodEnd, searchQuery, jobSortOrder]);
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
@@ -418,7 +441,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="font-bold text-gray-800 text-base">รายการบันทึกงานติดตั้งผ้าม่าน</h2>
           <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-semibold">
-            {filteredJobs.length} งาน
+            {displayJobs.length} งาน
           </span>
           <button
             onClick={() => setFilterByPeriod(!filterByPeriod)}
@@ -458,12 +481,13 @@ export const JobManagement: React.FC<JobManagementProps> = ({
 
           {/* Sort selector */}
           <select
-            className="border border-gray-200 rounded-xl text-xs px-2.5 py-1.5 bg-white text-gray-700 font-medium focus:outline-none"
+            className="border border-gray-200 rounded-xl text-xs px-2.5 py-1.5 bg-white text-gray-700 font-medium focus:outline-none shadow-2xs"
             value={jobSortOrder}
-            onChange={e => setJobSortOrder(e.target.value as 'asc' | 'desc')}
+            onChange={e => setJobSortOrder(e.target.value as 'asc' | 'desc' | 'manual')}
           >
-            <option value="desc">เรียง: ล่าสุดขึ้นก่อน</option>
-            <option value="asc">เรียง: เก่าสุดขึ้นก่อน</option>
+            <option value="manual">เรียง: ตามลำดับนำเข้า / กำหนดเอง</option>
+            <option value="desc">เรียง: วันที่ล่าสุดขึ้นก่อน</option>
+            <option value="asc">เรียง: วันที่เก่าสุดขึ้นก่อน</option>
           </select>
 
           {/* Action Buttons Group on the same line */}
@@ -524,7 +548,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-xs">
-            {filteredJobs.map((job, index) => {
+            {displayJobs.map((job, index) => {
               const calcVal = (job as any).calculatedValue || 0;
 
               return (
@@ -713,18 +737,30 @@ export const JobManagement: React.FC<JobManagementProps> = ({
 
                   {/* Up / Down ordering */}
                   <td className="p-3 text-center align-top">
-                    <div className="flex flex-col items-center gap-1">
+                    <div className="flex flex-col items-center gap-0.5">
                       <button
                         onClick={() => onMoveJob(job.id, -1)}
-                        className="text-gray-400 hover:text-gray-900 p-0.5"
+                        disabled={index === 0}
+                        className={`p-0.5 rounded transition-colors ${
+                          index === 0
+                            ? 'text-gray-200 cursor-not-allowed'
+                            : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                        }`}
+                        title="เลื่อนขึ้นด้านบน"
                       >
-                        <ArrowUp size={12} />
+                        <ArrowUp size={13} />
                       </button>
                       <button
                         onClick={() => onMoveJob(job.id, 1)}
-                        className="text-gray-400 hover:text-gray-900 p-0.5"
+                        disabled={index === displayJobs.length - 1}
+                        className={`p-0.5 rounded transition-colors ${
+                          index === displayJobs.length - 1
+                            ? 'text-gray-200 cursor-not-allowed'
+                            : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                        }`}
+                        title="เลื่อนลงด้านล่าง"
                       >
-                        <ArrowDown size={12} />
+                        <ArrowDown size={13} />
                       </button>
                     </div>
                   </td>
@@ -743,7 +779,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
               );
             })}
 
-            {filteredJobs.length === 0 && (
+            {displayJobs.length === 0 && (
               <tr>
                 <td colSpan={10} className="text-center py-12 text-gray-400">
                   ไม่พบรายการงานติดตั้งผ้าม่าน
