@@ -32,12 +32,32 @@ export type JobTypeId =
   | 'install_wall_mural'
   | 'fix' 
   | 'fix_scaffold' 
-  | 'fix_free';
+  | 'fix_free'
+  | string;
+
+export type UnitType = 'rails' | 'sqm' | 'fixed' | 'none';
+
+export type CalcFormulaType = 
+  | 'curtain_standard'      // base attendance * techs + extra rails over threshold * extraRailRate + specialBonus
+  | 'rate_per_sqm'          // quantity (sqm) * ratePerSqm + (baseAttendanceRate * techs)
+  | 'rate_per_unit'         // quantity * ratePerUnit + (baseAttendanceRate * techs)
+  | 'fixed_per_job'         // fixed amount for job (split among techs)
+  | 'fixed_per_tech'        // fixed amount * count of techs (e.g. measure job: 250 * techs)
+  | 'free_no_pay';          // 0 pay
 
 export interface JobTypeConfig {
-  id: JobTypeId;
+  id: string;
   label: string;
+  unitType?: UnitType;
+  unitLabel?: string;
   isExcludedFromRails?: boolean;
+  calcFormulaType?: CalcFormulaType;
+  ratePerUnit?: number; // e.g. 50 THB/sq.m. for WallLinen, 75 for WallMural
+  baseAttendancePerTech?: number; // specific attendance pay for this job type per tech
+  fixedAmount?: number;
+  bonusAmount?: number;
+  isSystem?: boolean;
+  description?: string;
 }
 
 export interface Job {
@@ -48,7 +68,7 @@ export interface Job {
   customer: string;
   location: string;
   type: JobTypeId;
-  rails: number;
+  rails: number; // Supports 1 decimal place e.g. 12.5 for sqm
   selectedTechs: string[]; // Member IDs
   isChecked: boolean;
   orderIndex: number;
@@ -79,7 +99,7 @@ export interface PayPeriod {
 }
 
 export interface IncentiveRules {
-  baseTechPay: number;        // e.g. 250 THB per tech
+  baseTechPay: number;        // e.g. 250 THB per tech for standard curtains
   measureTechPay: number;     // e.g. 250 THB per tech
   freeRailsThreshold: number; // e.g. 10 rails
   extraRailRate: number;      // e.g. 20 THB per extra rail
@@ -87,6 +107,9 @@ export interface IncentiveRules {
   scaffoldBonus: number;      // e.g. 200 THB extra
   wallLinenSqmRate?: number;  // e.g. 50 THB per sq.m.
   wallMuralSqmRate?: number;  // e.g. 75 THB per sq.m.
+  wallLinenAttendancePay?: number; // ค่าเข้างานช่าง WallLinen แต่ละคน (แยกจากผ้าม่าน)
+  wallMuralAttendancePay?: number; // ค่าเข้างานช่าง WallMural แต่ละคน (แยกจากผ้าม่าน)
+  customJobTypes?: JobTypeConfig[]; // Custom job types configured by Super Admin
 }
 
 export interface NotificationState {
@@ -99,3 +122,4 @@ export interface ConfirmModalState {
   message: string;
   onConfirm: () => void;
 }
+

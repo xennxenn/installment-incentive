@@ -1,4 +1,4 @@
-import { Job, Team, LeaveRecord, PayPeriod, IncentiveRules, JobTypeId } from '../types';
+import { Job, Team, LeaveRecord, PayPeriod, IncentiveRules, JobTypeId, JobTypeConfig } from '../types';
 import { JOB_TYPES, LEAVE_TYPES } from '../data/initialData';
 
 export interface CalculatedReportRow {
@@ -13,12 +13,17 @@ export interface CalculatedReportRow {
   inc: number | string;
   isHoliday?: boolean;
   isLeave?: boolean;
+  orderNo?: string;
+  teamName?: string;
+  isChecked?: boolean;
 }
 
 export interface CalculatedTeamStat extends Team {
   totalEarned: number;
   totalRails: number;
+  totalWallSqm: number;
   totalMeasures: number;
+  totalJobs: number;
   members: Array<{
     id: string;
     name: string;
@@ -41,6 +46,40 @@ export interface IndividualStat {
   leaves: Array<{ date: string; type: string }>;
 }
 
+export interface JobTypeOverallStat {
+  typeId: string;
+  label: string;
+  unitLabel: string;
+  jobCount: number;
+  totalQuantity: number;
+  totalIncentive: number;
+  percentage: number;
+}
+
+export interface JobTypeBreakdownItem {
+  typeId: string;
+  label: string;
+  unitLabel: string;
+  jobCount: number;
+  totalQuantity: number;
+  totalIncentive: number;
+}
+
+export interface JobTypeTeamStat {
+  teamId: string;
+  teamName: string;
+  totalIncentive: number;
+  breakdown: JobTypeBreakdownItem[];
+}
+
+export interface JobTypeTechStat {
+  techId: string;
+  techName: string;
+  teamName: string;
+  totalIncentive: number;
+  breakdown: JobTypeBreakdownItem[];
+}
+
 export interface CalculationResult {
   periodJobs: Job[];
   totalIncentive: number;
@@ -49,9 +88,16 @@ export interface CalculationResult {
   totalTechs: number;
   periodWorkingDays: number;
   totalRails: number;
+  totalWallSqm: number;
   totalMeasureJobs: number;
   reportTeamLogs: Record<string, { name: string; rows: CalculatedReportRow[] }>;
   reportTechLogs: Record<string, { name: string; teamName: string; rows: CalculatedReportRow[] }>;
+  allJobsDetailed: CalculatedReportRow[];
+  jobTypeAnalytics: {
+    overall: JobTypeOverallStat[];
+    byTeam: JobTypeTeamStat[];
+    byTech: JobTypeTechStat[];
+  };
 }
 
 export const formatDateTH = (dateStr: string): string => {
@@ -66,6 +112,12 @@ export const formatDateTH = (dateStr: string): string => {
   } catch (e) {
     return dateStr;
   }
+};
+
+export const formatQuantity = (val: number, unitLabel?: string): string => {
+  if (val === 0) return '0';
+  const formatted = Number.isInteger(val) ? val.toString() : val.toFixed(1);
+  return unitLabel ? `${formatted} ${unitLabel}` : formatted;
 };
 
 export const getDaysArray = (startStr: string, endStr: string): string[] => {
@@ -100,7 +152,23 @@ export function calculateIncentives(
   const safeJobs = (jobs || []).filter(Boolean);
   const safeLeaves = (leaves || []).filter(Boolean);
   const safeHolidays = (holidays || []).filter(Boolean);
-  const safeRules = rules || { baseTechPay: 250, freeRailsThreshold: 10, extraRailRate: 20, measureTechPay: 250, highLadderBonus: 100, scaffoldBonus: 200, wallLinenSqmRate: 50, wallMuralSqmRate: 75 };
+  const safeRules = rules || {
+    baseTechPay: 250,
+    freeRailsThreshold: 10,
+    extraRailRate: 20,
+    measureTechPay: 250,
+    highLadderBonus: 100,
+    scaffoldBonus: 200,
+    wallLinenSqmRate: 50,
+    wallMuralSqmRate: 75,
+    wallLinenAttendancePay: 0,
+    wallMuralAttendancePay: 0,
+    customJobTypes: JOB_TYPES
+  };
+
+  const allConfiguredTypes: JobTypeConfig[] = (safeRules.customJobTypes && safeRules.customJobTypes.length > 0)
+    ? safeRules.customJobTypes
+    : JOB_TYPES;
 
   const periodJobs = safeJobs.filter(j => j && j.date && j.date >= safePeriod.start && j.date <= safePeriod.end);
 
@@ -124,22 +192,31 @@ export function calculateIncentives(
     }
   });
 
-  const dailyTeamIncentive: Record<string, Record<string, { amount: number; rails: number; measures: number }>> = {};
+  const dailyTeamIncentive: Record<string, Record<string, { amount: number; rails: number; wallSqm: number; measures: number; jobsCount: number }>> = {};
   let globalTotalRails = 0;
+  let globalTotalWallSqm = 0;
   let globalTotalMeasureJobs = 0;
 
   // 1. Process each job to compute calculatedValue and split into teams
   safeJobs.forEach(job => {
     let val = 0;
-    const rails = Math.max(0, parseInt(String(job.rails)) || 0);
+    // Allow 1 decimal place float (e.g. 12.5)
+    const rawVal = parseFloat(String(job.rails));
+    const railsOrSqm = isNaN(rawVal) ? 0 : Math.max(0, Math.round(rawVal * 10) / 10);
     const isInPeriod = job && job.date && job.date >= safePeriod.start && job.date <= safePeriod.end;
-    const excludedTypes: JobTypeId[] = ['measure', 'travel_go', 'travel_back', 'fix_free', 'install_wall_linen', 'install_wall_mural'];
+
+    const currentTypeConfig = allConfiguredTypes.find(t => t.id === job.type);
+    const isCurtain = !currentTypeConfig?.isExcludedFromRails && (!currentTypeConfig?.unitType || currentTypeConfig.unitType === 'rails');
+    const isSqm = currentTypeConfig?.unitType === 'sqm' || job.type === 'install_wall_linen' || job.type === 'install_wall_mural';
+    const isMeasure = job.type === 'measure' || currentTypeConfig?.calcFormulaType === 'fixed_per_tech';
 
     if (isInPeriod) {
-      if (!excludedTypes.includes(job.type)) {
-        globalTotalRails += rails;
+      if (isCurtain) {
+        globalTotalRails += railsOrSqm;
+      } else if (isSqm) {
+        globalTotalWallSqm += railsOrSqm;
       }
-      if (job.type === 'measure') {
+      if (isMeasure) {
         globalTotalMeasureJobs += 1;
       }
     }
@@ -172,22 +249,49 @@ export function calculateIncentives(
     if (cnt === 0) {
       val = 0;
     } else {
+      // Calculation logic based on job type
       if (job.type === 'measure') {
-        val = safeRules.measureTechPay * cnt;
+        val = (safeRules.measureTechPay || 250) * cnt;
       } else if (job.type === 'install_wall_linen') {
         const rate = safeRules.wallLinenSqmRate ?? 50;
-        val = rails * rate;
+        const attendance = safeRules.wallLinenAttendancePay ?? 0;
+        val = (railsOrSqm * rate) + (attendance * cnt);
       } else if (job.type === 'install_wall_mural') {
         const rate = safeRules.wallMuralSqmRate ?? 75;
-        val = rails * rate;
+        const attendance = safeRules.wallMuralAttendancePay ?? 0;
+        val = (railsOrSqm * rate) + (attendance * cnt);
       } else if (['travel_go', 'travel_back', 'fix_free'].includes(job.type)) {
         val = 0;
+      } else if (currentTypeConfig) {
+        // Custom job type handling
+        if (currentTypeConfig.calcFormulaType === 'free_no_pay') {
+          val = 0;
+        } else if (currentTypeConfig.calcFormulaType === 'rate_per_sqm' || currentTypeConfig.calcFormulaType === 'rate_per_unit') {
+          const rate = currentTypeConfig.ratePerUnit ?? 50;
+          const attendance = currentTypeConfig.baseAttendancePerTech ?? 0;
+          val = (railsOrSqm * rate) + (attendance * cnt);
+        } else if (currentTypeConfig.calcFormulaType === 'fixed_per_tech') {
+          val = (currentTypeConfig.fixedAmount ?? 250) * cnt;
+        } else if (currentTypeConfig.calcFormulaType === 'fixed_per_job') {
+          val = (currentTypeConfig.fixedAmount ?? 0);
+        } else {
+          // Standard curtain formula with optional bonus
+          const basePay = (currentTypeConfig.baseAttendancePerTech ?? safeRules.baseTechPay ?? 250) * cnt;
+          const extraRails = railsOrSqm > (safeRules.freeRailsThreshold ?? 10)
+            ? (railsOrSqm - (safeRules.freeRailsThreshold ?? 10)) * (safeRules.extraRailRate ?? 20)
+            : 0;
+          const specialBonus = currentTypeConfig.bonusAmount ?? 0;
+          val = basePay + extraRails + specialBonus;
+        }
       } else {
-        const basePay = safeRules.baseTechPay * cnt;
-        const extraRails = rails > safeRules.freeRailsThreshold ? (rails - safeRules.freeRailsThreshold) * safeRules.extraRailRate : 0;
+        // Fallback standard curtain formula
+        const basePay = (safeRules.baseTechPay || 250) * cnt;
+        const extraRails = railsOrSqm > (safeRules.freeRailsThreshold || 10)
+          ? (railsOrSqm - (safeRules.freeRailsThreshold || 10)) * (safeRules.extraRailRate || 20)
+          : 0;
         let specialBonus = 0;
-        if (job.type === 'install_high') specialBonus = safeRules.highLadderBonus;
-        if (job.type === 'install_scaffold' || job.type === 'fix_scaffold') specialBonus = safeRules.scaffoldBonus;
+        if (job.type === 'install_high') specialBonus = safeRules.highLadderBonus || 100;
+        if (job.type === 'install_scaffold' || job.type === 'fix_scaffold') specialBonus = safeRules.scaffoldBonus || 200;
 
         val = basePay + extraRails + specialBonus;
       }
@@ -217,14 +321,17 @@ export function calculateIncentives(
         const teamShare = (val * teamTechCount) / totalTechsInJob;
 
         if (!dailyTeamIncentive[date][teamId]) {
-          dailyTeamIncentive[date][teamId] = { amount: 0, rails: 0, measures: 0 };
+          dailyTeamIncentive[date][teamId] = { amount: 0, rails: 0, wallSqm: 0, measures: 0, jobsCount: 0 };
         }
         dailyTeamIncentive[date][teamId].amount += teamShare;
+        dailyTeamIncentive[date][teamId].jobsCount += 1 / totalTeamsCount;
 
-        if (!excludedTypes.includes(job.type)) {
-          dailyTeamIncentive[date][teamId].rails += rails / totalTeamsCount;
+        if (isCurtain) {
+          dailyTeamIncentive[date][teamId].rails += railsOrSqm / totalTeamsCount;
+        } else if (isSqm) {
+          dailyTeamIncentive[date][teamId].wallSqm += railsOrSqm / totalTeamsCount;
         }
-        if (job.type === 'measure') {
+        if (isMeasure) {
           dailyTeamIncentive[date][teamId].measures += 1;
         }
       });
@@ -236,6 +343,7 @@ export function calculateIncentives(
 
   const reportTeamLogs: Record<string, { name: string; rows: CalculatedReportRow[] }> = {};
   const reportTechLogs: Record<string, { name: string; teamName: string; rows: CalculatedReportRow[] }> = {};
+  const allJobsDetailed: CalculatedReportRow[] = [];
 
   safeTeams.forEach(t => {
     if (!t) return;
@@ -244,6 +352,15 @@ export function calculateIncentives(
       if (!m) return;
       reportTechLogs[m.id] = { name: m.name || '', teamName: t.name || '', rows: [] };
     });
+  });
+
+  // Track job-type level statistics
+  const jobTypeCountMap: Record<string, { count: number; quantity: number; incentive: number }> = {};
+  const jobTypeTeamMap: Record<string, Record<string, { count: number; quantity: number; incentive: number }>> = {};
+  const jobTypeTechMap: Record<string, Record<string, { count: number; quantity: number; incentive: number }>> = {};
+
+  allConfiguredTypes.forEach(t => {
+    jobTypeCountMap[t.id] = { count: 0, quantity: 0, incentive: 0 };
   });
 
   const teamStats: CalculatedTeamStat[] = safeTeams.map(team => {
@@ -258,7 +375,9 @@ export function calculateIncentives(
 
     let teamTotalEarned = 0;
     let teamTotalRails = 0;
+    let teamTotalWallSqm = 0;
     let teamTotalMeasures = 0;
+    let teamTotalJobs = 0;
 
     daysInPeriod.forEach(day => {
       const dayStats = dailyTeamIncentive[day]?.[team.id];
@@ -364,20 +483,29 @@ export function calculateIncentives(
 
         const totalTeams = Object.keys(involvedTeams).length;
         const isShared = totalTeams > 1;
-        const excludedTypes: JobTypeId[] = ['measure', 'travel_go', 'travel_back', 'fix_free', 'install_wall_linen', 'install_wall_mural'];
-        const isExcluded = excludedTypes.includes(job.type);
-        const isSqmJob = job.type === 'install_wall_linen' || job.type === 'install_wall_mural';
+
+        const currentType = allConfiguredTypes.find(t => t.id === job.type);
+        const isExcluded = currentType?.isExcludedFromRails || ['measure', 'travel_go', 'travel_back', 'fix_free', 'install_wall_linen', 'install_wall_mural'].includes(job.type);
+        const isSqmJob = currentType?.unitType === 'sqm' || job.type === 'install_wall_linen' || job.type === 'install_wall_mural';
+        const rawRails = parseFloat(String(job.rails));
+        const jobRailsOrSqm = isNaN(rawRails) ? 0 : Math.round(rawRails * 10) / 10;
 
         if (involvedTeams[team.id]) {
           const teamTechs = involvedTeams[team.id];
           const teamTechCount = teamTechs.length;
           const jobVal = (job as Job & { calculatedValue?: number }).calculatedValue || 0;
-          const jobRails = parseInt(String(job.rails)) || 0;
 
           const teamShareAmt = totalTechsInJob > 0 ? (jobVal * teamTechCount) / totalTechsInJob : 0;
-          const teamRailsShare = isExcluded ? 0 : jobRails / totalTeams;
-          const typeLabel = JOB_TYPES.find(t => t.id === job.type)?.label || job.type;
+          const teamRailsShare = isExcluded ? 0 : jobRailsOrSqm / totalTeams;
+          const typeLabel = currentType?.label || job.type;
           const noteStr = isShared ? 'งานควบ' : '';
+
+          let formattedQuantity: string | number = '-';
+          if (isSqmJob) {
+            formattedQuantity = `${jobRailsOrSqm} ตร.ม.`;
+          } else if (!isExcluded) {
+            formattedQuantity = Number.isInteger(teamRailsShare) ? teamRailsShare : Number(teamRailsShare.toFixed(1));
+          }
 
           reportTeamLogs[team.id]?.rows.push({
             date: job.date,
@@ -385,10 +513,12 @@ export function calculateIncentives(
             type: typeLabel,
             customer: job.customer || '-',
             location: job.location || '-',
-            rails: isSqmJob ? `${jobRails} ตร.ม.` : (isExcluded ? '-' : Number(teamRailsShare.toFixed(2))),
+            rails: formattedQuantity,
             techs: teamTechCount,
             note: noteStr,
-            inc: teamShareAmt
+            inc: teamShareAmt,
+            orderNo: job.orderNo,
+            isChecked: job.isChecked
           });
 
           // Compute individual head share
@@ -409,24 +539,56 @@ export function calculateIncentives(
             let noteDisplay = noteStr;
             if (isNoInc) noteDisplay = noteStr ? `${noteStr} (No Incentive)` : 'No Incentive';
 
+            let memberQty: string | number = '-';
+            if (isSqmJob) {
+              memberQty = `${jobRailsOrSqm} ตร.ม.`;
+            } else if (!isExcluded) {
+              memberQty = isEligible ? (Number.isInteger(railsPerHead) ? railsPerHead : Number(railsPerHead.toFixed(1))) : 0;
+            }
+
             reportTechLogs[m.id]?.rows.push({
               date: job.date,
               time: job.timeSlot || '-',
               type: typeLabel,
               customer: job.customer || '-',
               location: job.location || '-',
-              rails: isSqmJob ? `${jobRails} ตร.ม.` : (isExcluded ? '-' : (isEligible ? Number(railsPerHead.toFixed(2)) : 0)),
+              rails: memberQty,
               techs: teamTechCount,
               note: noteDisplay,
-              inc: isEligible ? sharePerHead : 0
+              inc: isEligible ? sharePerHead : 0,
+              orderNo: job.orderNo,
+              isChecked: job.isChecked
             });
+
+            // Update Job Type Tech Stats
+            if (isEligible && sharePerHead > 0) {
+              if (!jobTypeTechMap[m.id]) jobTypeTechMap[m.id] = {};
+              if (!jobTypeTechMap[m.id][job.type]) {
+                jobTypeTechMap[m.id][job.type] = { count: 0, quantity: 0, incentive: 0 };
+              }
+              jobTypeTechMap[m.id][job.type].count += 1;
+              jobTypeTechMap[m.id][job.type].quantity += typeof memberQty === 'number' ? memberQty : (isSqmJob ? jobRailsOrSqm : 0);
+              jobTypeTechMap[m.id][job.type].incentive += sharePerHead;
+            }
           });
+
+          // Update Job Type Team Stats
+          if (!jobTypeTeamMap[team.id]) jobTypeTeamMap[team.id] = {};
+          if (!jobTypeTeamMap[team.id][job.type]) {
+            jobTypeTeamMap[team.id][job.type] = { count: 0, quantity: 0, incentive: 0 };
+          }
+          jobTypeTeamMap[team.id][job.type].count += 1;
+          jobTypeTeamMap[team.id][job.type].quantity += jobRailsOrSqm;
+          jobTypeTeamMap[team.id][job.type].incentive += teamShareAmt;
         }
       });
 
       if (dayStats) {
         teamTotalRails += dayStats.rails;
+        teamTotalWallSqm += dayStats.wallSqm;
         teamTotalMeasures += dayStats.measures;
+        teamTotalJobs += dayStats.jobsCount;
+
         const dailyPot = dayStats.amount || 0;
         if (dailyPot > 0) {
           teamTotalEarned += dailyPot;
@@ -448,8 +610,10 @@ export function calculateIncentives(
     return {
       ...team,
       totalEarned: teamTotalEarned,
-      totalRails: teamTotalRails,
+      totalRails: Math.round(teamTotalRails * 10) / 10,
+      totalWallSqm: Math.round(teamTotalWallSqm * 10) / 10,
       totalMeasures: teamTotalMeasures,
+      totalJobs: Math.round(teamTotalJobs),
       members: membersList.map(m => ({
         ...m,
         incentive: memberEarnings[m.id] || 0,
@@ -464,6 +628,55 @@ export function calculateIncentives(
     };
   });
 
+  // Build All Jobs Detailed Master List
+  periodJobs.forEach(job => {
+    const currentType = allConfiguredTypes.find(t => t.id === job.type);
+    const typeLabel = currentType?.label || job.type;
+    const isSqmJob = currentType?.unitType === 'sqm' || job.type === 'install_wall_linen' || job.type === 'install_wall_mural';
+    const rawRails = parseFloat(String(job.rails));
+    const qty = isNaN(rawRails) ? 0 : Math.round(rawRails * 10) / 10;
+    const isExcluded = currentType?.isExcludedFromRails || ['measure', 'travel_go', 'travel_back', 'fix_free'].includes(job.type);
+
+    let displayQty: string | number = '-';
+    if (isSqmJob) {
+      displayQty = `${qty} ตร.ม.`;
+    } else if (!isExcluded) {
+      displayQty = Number.isInteger(qty) ? qty : qty.toFixed(1);
+    }
+
+    // Collect team names
+    const teamNamesSet = new Set<string>();
+    (job.selectedTechs || []).forEach(tid => {
+      const tm = safeTeams.find(t => (t.members || []).some(m => m.id === tid));
+      if (tm?.name) teamNamesSet.add(tm.name);
+    });
+
+    const jobIncentive = (job as Job & { calculatedValue?: number }).calculatedValue || 0;
+
+    allJobsDetailed.push({
+      date: job.date,
+      time: job.timeSlot || '-',
+      type: typeLabel,
+      customer: job.customer || '-',
+      location: job.location || '-',
+      rails: displayQty,
+      techs: (job.selectedTechs || []).length,
+      note: Array.from(teamNamesSet).join(', ') || '-',
+      inc: jobIncentive,
+      orderNo: job.orderNo || '-',
+      teamName: Array.from(teamNamesSet).join(', ') || 'ไม่มีทีม',
+      isChecked: job.isChecked
+    });
+
+    // Update Overall Job Type Stats
+    if (!jobTypeCountMap[job.type]) {
+      jobTypeCountMap[job.type] = { count: 0, quantity: 0, incentive: 0 };
+    }
+    jobTypeCountMap[job.type].count += 1;
+    jobTypeCountMap[job.type].quantity += qty;
+    jobTypeCountMap[job.type].incentive += jobIncentive;
+  });
+
   const exactTotalIncentive = teamStats.reduce((sum, t) => sum + t.totalEarned, 0);
 
   const individualStats: IndividualStat[] = (teamStats || [])
@@ -473,6 +686,86 @@ export function calculateIncentives(
 
   const totalTechs = teamStats.reduce((acc, t) => acc + (t.members || []).length, 0);
 
+  // Overall Job Type Analytics
+  const overallJobTypeStats: JobTypeOverallStat[] = Object.keys(jobTypeCountMap)
+    .map(typeId => {
+      const config = allConfiguredTypes.find(t => t.id === typeId);
+      const data = jobTypeCountMap[typeId];
+      const percent = exactTotalIncentive > 0 ? (data.incentive / exactTotalIncentive) * 100 : 0;
+      return {
+        typeId,
+        label: config?.label || typeId,
+        unitLabel: config?.unitLabel || (config?.unitType === 'sqm' ? 'ตร.ม.' : config?.unitType === 'rails' ? 'ราง' : '-'),
+        jobCount: data.count,
+        totalQuantity: Math.round(data.quantity * 10) / 10,
+        totalIncentive: data.incentive,
+        percentage: Math.round(percent * 10) / 10
+      };
+    })
+    .filter(stat => stat.jobCount > 0 || stat.totalIncentive > 0)
+    .sort((a, b) => b.totalIncentive - a.totalIncentive);
+
+  // Job Type by Team
+  const jobTypeByTeamStats: JobTypeTeamStat[] = safeTeams
+    .map(t => {
+      const teamBreakdownMap = jobTypeTeamMap[t.id] || {};
+      const breakdown: JobTypeBreakdownItem[] = Object.keys(teamBreakdownMap)
+        .map(typeId => {
+          const config = allConfiguredTypes.find(ct => ct.id === typeId);
+          const data = teamBreakdownMap[typeId];
+          return {
+            typeId,
+            label: config?.label || typeId,
+            unitLabel: config?.unitLabel || (config?.unitType === 'sqm' ? 'ตร.ม.' : config?.unitType === 'rails' ? 'ราง' : '-'),
+            jobCount: data.count,
+            totalQuantity: Math.round(data.quantity * 10) / 10,
+            totalIncentive: data.incentive
+          };
+        })
+        .filter(b => b.jobCount > 0 || b.totalIncentive > 0)
+        .sort((a, b) => b.totalIncentive - a.totalIncentive);
+
+      const teamTotal = breakdown.reduce((sum, b) => sum + b.totalIncentive, 0);
+      return {
+        teamId: t.id,
+        teamName: t.name,
+        totalIncentive: teamTotal,
+        breakdown
+      };
+    })
+    .filter(t => t.breakdown.length > 0);
+
+  // Job Type by Tech
+  const jobTypeByTechStats: JobTypeTechStat[] = individualStats
+    .map(m => {
+      const techBreakdownMap = jobTypeTechMap[m.id] || {};
+      const breakdown: JobTypeBreakdownItem[] = Object.keys(techBreakdownMap)
+        .map(typeId => {
+          const config = allConfiguredTypes.find(ct => ct.id === typeId);
+          const data = techBreakdownMap[typeId];
+          return {
+            typeId,
+            label: config?.label || typeId,
+            unitLabel: config?.unitLabel || (config?.unitType === 'sqm' ? 'ตร.ม.' : config?.unitType === 'rails' ? 'ราง' : '-'),
+            jobCount: data.count,
+            totalQuantity: Math.round(data.quantity * 10) / 10,
+            totalIncentive: data.incentive
+          };
+        })
+        .filter(b => b.jobCount > 0 || b.totalIncentive > 0)
+        .sort((a, b) => b.totalIncentive - a.totalIncentive);
+
+      const techTotal = breakdown.reduce((sum, b) => sum + b.totalIncentive, 0);
+      return {
+        techId: m.id,
+        techName: m.name,
+        teamName: m.teamName,
+        totalIncentive: techTotal,
+        breakdown
+      };
+    })
+    .filter(tech => tech.breakdown.length > 0);
+
   return {
     periodJobs,
     totalIncentive: Math.round(exactTotalIncentive),
@@ -480,9 +773,17 @@ export function calculateIncentives(
     individualStats,
     totalTechs,
     periodWorkingDays,
-    totalRails: globalTotalRails,
+    totalRails: Math.round(globalTotalRails * 10) / 10,
+    totalWallSqm: Math.round(globalTotalWallSqm * 10) / 10,
     totalMeasureJobs: globalTotalMeasureJobs,
     reportTeamLogs,
-    reportTechLogs
+    reportTechLogs,
+    allJobsDetailed,
+    jobTypeAnalytics: {
+      overall: overallJobTypeStats,
+      byTeam: jobTypeByTeamStats,
+      byTech: jobTypeByTechStats
+    }
   };
 }
+

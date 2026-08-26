@@ -46,6 +46,14 @@ export const JobManagement: React.FC<JobManagementProps> = ({
   jobSortOrder,
   setJobSortOrder
 }) => {
+  const availableJobTypes = rules?.customJobTypes && rules.customJobTypes.length > 0
+    ? rules.customJobTypes
+    : JOB_TYPES;
+
+  const getJobTypeInfo = (typeId: string) => {
+    return availableJobTypes.find(t => t.id === typeId) || JOB_TYPES.find(t => t.id === typeId);
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterByPeriod, setFilterByPeriod] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -612,7 +620,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
                       onChange={e => onUpdateJob(job.id, 'type', e.target.value as JobTypeId)}
                       className="border border-gray-200 rounded-lg p-1.5 w-full text-xs font-semibold text-gray-800 bg-white"
                     >
-                      {JOB_TYPES.map(t => (
+                      {availableJobTypes.map(t => (
                         <option key={t.id} value={t.id}>
                           {t.label}
                         </option>
@@ -620,30 +628,37 @@ export const JobManagement: React.FC<JobManagementProps> = ({
                     </select>
                   </td>
 
-                  {/* Rails count */}
-                  <td className="p-3 align-top text-center">
-                    <input
-                      type="number"
-                      min={0}
-                      step={job.type === 'install_wall_linen' || job.type === 'install_wall_mural' ? "0.1" : "1"}
-                      value={job.rails}
-                      onWheel={e => e.currentTarget.blur()}
-                      onChange={e => {
-                        const raw = parseFloat(e.target.value);
-                        if (isNaN(raw)) {
-                          onUpdateJob(job.id, 'rails', 0);
-                        } else {
-                          const isSqm = job.type === 'install_wall_linen' || job.type === 'install_wall_mural';
-                          const val = isSqm ? Math.round(raw * 10) / 10 : Math.round(raw);
-                          onUpdateJob(job.id, 'rails', val);
-                        }
-                      }}
-                      className="border border-gray-200 rounded-lg p-1.5 w-16 text-center text-xs font-bold bg-white"
-                    />
-                    <div className="text-[10px] text-gray-400 mt-0.5 font-medium">
-                      {job.type === 'install_wall_linen' || job.type === 'install_wall_mural' ? 'ตร.ม.' : 'ราง'}
-                    </div>
-                  </td>
+                  {/* Rails / Units count */}
+                  {(() => {
+                    const currentTypeInfo = getJobTypeInfo(job.type);
+                    const isSqmUnit = currentTypeInfo?.unitType === 'sqm' || job.type === 'install_wall_linen' || job.type === 'install_wall_mural';
+                    const unitLabel = currentTypeInfo?.unitLabel || (isSqmUnit ? 'ตร.ม.' : currentTypeInfo?.unitType === 'rails' ? 'ราง' : currentTypeInfo?.unitType === 'fixed' ? 'งาน' : '-');
+
+                    return (
+                      <td className="p-3 align-top text-center">
+                        <input
+                          type="number"
+                          min={0}
+                          step={isSqmUnit ? "0.1" : "1"}
+                          value={job.rails}
+                          onWheel={e => e.currentTarget.blur()}
+                          onChange={e => {
+                            const raw = parseFloat(e.target.value);
+                            if (isNaN(raw)) {
+                              onUpdateJob(job.id, 'rails', 0);
+                            } else {
+                              const val = isSqmUnit ? Math.round(raw * 10) / 10 : Math.round(raw);
+                              onUpdateJob(job.id, 'rails', val);
+                            }
+                          }}
+                          className="border border-gray-200 rounded-lg p-1.5 w-16 text-center text-xs font-bold bg-white"
+                        />
+                        <div className="text-[10px] text-gray-400 mt-0.5 font-medium">
+                          {unitLabel}
+                        </div>
+                      </td>
+                    );
+                  })()}
 
                   {/* Tech Selector badges */}
                   <td className="p-3 align-top">
@@ -878,41 +893,47 @@ export const JobManagement: React.FC<JobManagementProps> = ({
                     value={newType}
                     onChange={e => setNewType(e.target.value as JobTypeId)}
                   >
-                    {JOB_TYPES.map(t => (
+                    {availableJobTypes.map(t => (
                       <option key={t.id} value={t.id}>
                         {t.label}
                       </option>
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">
-                    จำนวน ({newType === 'install_wall_linen' || newType === 'install_wall_mural' ? 'ตร.ม.' : 'ราง'}):
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={newType === 'install_wall_linen' || newType === 'install_wall_mural' ? "0.1" : "1"}
-                    className="w-full border rounded-xl p-2 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
-                    value={newRails}
-                    onChange={e => {
-                      const raw = parseFloat(e.target.value);
-                      if (isNaN(raw)) {
-                        setNewRails(0);
-                      } else {
-                        const isSqm = newType === 'install_wall_linen' || newType === 'install_wall_mural';
-                        const val = isSqm ? Math.round(raw * 10) / 10 : Math.round(raw);
-                        setNewRails(val);
-                      }
-                    }}
-                  />
-                  {newType === 'install_wall_linen' && (
-                    <p className="text-[10px] text-emerald-600 font-semibold mt-1">* คิดค่า Incentive 50 บาท / ตร.ม.</p>
-                  )}
-                  {newType === 'install_wall_mural' && (
-                    <p className="text-[10px] text-emerald-600 font-semibold mt-1">* คิดค่า Incentive 75 บาท / ตร.ม.</p>
-                  )}
-                </div>
+                {(() => {
+                  const currentSelectedType = getJobTypeInfo(newType);
+                  const isSqmUnit = currentSelectedType?.unitType === 'sqm' || newType === 'install_wall_linen' || newType === 'install_wall_mural';
+                  const unitLabel = currentSelectedType?.unitLabel || (isSqmUnit ? 'ตร.ม.' : currentSelectedType?.unitType === 'rails' ? 'ราง' : currentSelectedType?.unitType === 'fixed' ? 'งาน' : '-');
+
+                  return (
+                    <div>
+                      <label className="block font-bold text-gray-700 mb-1">
+                        จำนวน ({unitLabel}):
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={isSqmUnit ? "0.1" : "1"}
+                        className="w-full border rounded-xl p-2 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+                        value={newRails}
+                        onChange={e => {
+                          const raw = parseFloat(e.target.value);
+                          if (isNaN(raw)) {
+                            setNewRails(0);
+                          } else {
+                            const val = isSqmUnit ? Math.round(raw * 10) / 10 : Math.round(raw);
+                            setNewRails(val);
+                          }
+                        }}
+                      />
+                      {currentSelectedType?.description && (
+                        <p className="text-[10px] text-emerald-600 font-semibold mt-1">
+                          * {currentSelectedType.description}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Selecting Technicians */}

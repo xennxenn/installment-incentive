@@ -33,11 +33,11 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
     try {
       const saved = localStorage.getItem(`${APP_KEY_PREFIX}user`);
-      if (!saved) return DEFAULT_SUPER_ADMIN;
+      if (!saved) return null;
       const parsed = JSON.parse(saved);
-      return parsed && typeof parsed === 'object' && parsed.username ? parsed : DEFAULT_SUPER_ADMIN;
+      return parsed && typeof parsed === 'object' && parsed.username ? parsed : null;
     } catch (e) {
-      return DEFAULT_SUPER_ADMIN;
+      return null;
     }
   });
 

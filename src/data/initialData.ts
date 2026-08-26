@@ -21,6 +21,122 @@ export const DEFAULT_USERS: AppUser[] = [
   }
 ];
 
+export const JOB_TYPES: JobTypeConfig[] = [
+  { 
+    id: 'install', 
+    label: 'ติดตั้งทั่วไป', 
+    unitType: 'rails', 
+    unitLabel: 'ราง', 
+    calcFormulaType: 'curtain_standard', 
+    isSystem: true,
+    description: 'คิดฐานค่าช่าง + รางส่วนเกินเกินเกณฑ์ฟรี'
+  },
+  { 
+    id: 'install_high', 
+    label: 'ติดตั้ง/บันไดสูง', 
+    unitType: 'rails', 
+    unitLabel: 'ราง', 
+    calcFormulaType: 'curtain_standard', 
+    bonusAmount: 100, 
+    isSystem: true,
+    description: 'คิดสูตรมาตรฐาน + โบนัสบันไดสูง 100 บาท'
+  },
+  { 
+    id: 'install_scaffold', 
+    label: 'ติดตั้ง/นั่งร้าน', 
+    unitType: 'rails', 
+    unitLabel: 'ราง', 
+    calcFormulaType: 'curtain_standard', 
+    bonusAmount: 200, 
+    isSystem: true,
+    description: 'คิดสูตรมาตรฐาน + โบนัสนั่งร้าน 200 บาท'
+  },
+  { 
+    id: 'install_wall_linen', 
+    label: 'ติดตั้ง WallLinen', 
+    unitType: 'sqm', 
+    unitLabel: 'ตร.ม.', 
+    isExcludedFromRails: true, 
+    calcFormulaType: 'rate_per_sqm', 
+    ratePerUnit: 50, 
+    baseAttendancePerTech: 0,
+    isSystem: true,
+    description: 'คำนวณ 50 บาท/ตร.ม. (+ ค่าเข้างานต่อคนถ้ามี)'
+  },
+  { 
+    id: 'install_wall_mural', 
+    label: 'ติดตั้ง WallMural', 
+    unitType: 'sqm', 
+    unitLabel: 'ตร.ม.', 
+    isExcludedFromRails: true, 
+    calcFormulaType: 'rate_per_sqm', 
+    ratePerUnit: 75, 
+    baseAttendancePerTech: 0,
+    isSystem: true,
+    description: 'คำนวณ 75 บาท/ตร.ม. (+ ค่าเข้างานต่อคนถ้ามี)'
+  },
+  { 
+    id: 'measure', 
+    label: 'วัดพื้นที่', 
+    unitType: 'none', 
+    unitLabel: '-', 
+    isExcludedFromRails: true, 
+    calcFormulaType: 'fixed_per_tech', 
+    fixedAmount: 250, 
+    isSystem: true,
+    description: 'คิดเหมา 250 บาทต่อคน'
+  },
+  { 
+    id: 'fix', 
+    label: 'งานแก้ไข', 
+    unitType: 'rails', 
+    unitLabel: 'ราง', 
+    calcFormulaType: 'curtain_standard', 
+    isSystem: true,
+    description: 'คิดสูตรผ้าม่านมาตรฐาน'
+  },
+  { 
+    id: 'fix_scaffold', 
+    label: 'งานแก้ไข/นั่งร้าน', 
+    unitType: 'rails', 
+    unitLabel: 'ราง', 
+    calcFormulaType: 'curtain_standard', 
+    bonusAmount: 200, 
+    isSystem: true,
+    description: 'คิดสูตรมาตรฐาน + โบนัสนั่งร้าน 200 บาท'
+  },
+  { 
+    id: 'travel_go', 
+    label: 'วันเดินทางไป', 
+    unitType: 'none', 
+    unitLabel: '-', 
+    isExcludedFromRails: true, 
+    calcFormulaType: 'free_no_pay', 
+    isSystem: true,
+    description: 'บันทึกวันเดินทาง (ไม่คิดเงิน)'
+  },
+  { 
+    id: 'travel_back', 
+    label: 'วันเดินทางกลับ', 
+    unitType: 'none', 
+    unitLabel: '-', 
+    isExcludedFromRails: true, 
+    calcFormulaType: 'free_no_pay', 
+    isSystem: true,
+    description: 'บันทึกวันเดินทาง (ไม่คิดเงิน)'
+  },
+  { 
+    id: 'fix_free', 
+    label: 'แก้ไขซ้ำ/ไม่คิดค่าบริการ', 
+    unitType: 'none', 
+    unitLabel: '-', 
+    isExcludedFromRails: true, 
+    calcFormulaType: 'free_no_pay', 
+    isSystem: true,
+    description: 'งานแก้ไขซ้ำ ไม่คิด Incentive'
+  }
+];
+
 export const DEFAULT_INCENTIVE_RULES: IncentiveRules = {
   baseTechPay: 250,
   measureTechPay: 250,
@@ -29,22 +145,11 @@ export const DEFAULT_INCENTIVE_RULES: IncentiveRules = {
   highLadderBonus: 100,
   scaffoldBonus: 200,
   wallLinenSqmRate: 50,
-  wallMuralSqmRate: 75
+  wallMuralSqmRate: 75,
+  wallLinenAttendancePay: 0,
+  wallMuralAttendancePay: 0,
+  customJobTypes: JOB_TYPES
 };
-
-export const JOB_TYPES: JobTypeConfig[] = [
-  { id: 'install', label: 'ติดตั้งทั่วไป' },
-  { id: 'install_high', label: 'ติดตั้ง/บันไดสูง' },
-  { id: 'install_scaffold', label: 'ติดตั้ง/นั่งร้าน' },
-  { id: 'install_wall_linen', label: 'ติดตั้ง WallLinen (50 บาท/ตร.ม.)', isExcludedFromRails: true },
-  { id: 'install_wall_mural', label: 'ติดตั้ง WallMural (75 บาท/ตร.ม.)', isExcludedFromRails: true },
-  { id: 'measure', label: 'วัดพื้นที่', isExcludedFromRails: true },
-  { id: 'fix', label: 'งานแก้ไข' },
-  { id: 'fix_scaffold', label: 'งานแก้ไข/นั่งร้าน' },
-  { id: 'travel_go', label: 'วันเดินทางไป', isExcludedFromRails: true },
-  { id: 'travel_back', label: 'วันเดินทางกลับ', isExcludedFromRails: true },
-  { id: 'fix_free', label: 'แก้ไขซ้ำ/ไม่คิดค่าบริการ', isExcludedFromRails: true }
-];
 
 export const LEAVE_TYPES: LeaveTypeConfig[] = [
   { id: 'sick', label: 'ลาป่วย', short: 'ป', color: 'bg-red-100 text-red-700 border-red-200' },
