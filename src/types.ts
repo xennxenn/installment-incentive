@@ -98,6 +98,28 @@ export interface PayPeriod {
   end: string;   // YYYY-MM-DD
 }
 
+export type RuleScope = 'from_period_onward' | 'specific_period_only' | 'all_periods';
+
+export interface RuleVersion {
+  id: string;
+  name?: string;
+  effectiveFromPeriodId: string; // ID of period or 'all'
+  effectiveFromPeriodName?: string;
+  effectiveFromDate: string; // YYYY-MM-DD
+  scope: RuleScope;
+  specificPeriodId?: string;
+  rules: IncentiveRules;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface PeriodRuleSaveOptions {
+  scope: RuleScope;
+  targetPeriodId: string;
+  targetPeriodName?: string;
+  targetPeriodStartDate?: string;
+}
+
 export interface IncentiveRules {
   baseTechPay: number;        // e.g. 250 THB per tech for standard curtains
   measureTechPay: number;     // e.g. 250 THB per tech

@@ -5,7 +5,8 @@ import {
   Upload, FileUp, Download
 } from 'lucide-react';
 import { Job, Team, LeaveRecord, JobTypeId, IncentiveRules } from '../types';
-import { JOB_TYPES, TIME_SLOTS, DEFAULT_TIME_SLOT } from '../data/initialData';
+import { JOB_TYPES, TIME_SLOTS, DEFAULT_TIME_SLOT, DEFAULT_INCENTIVE_RULES } from '../data/initialData';
+import { calculateSingleJobIncentive } from '../utils/calculator';
 
 interface JobManagementProps {
   jobs: Job[];
@@ -231,23 +232,16 @@ export const JobManagement: React.FC<JobManagementProps> = ({
   };
 
   const computeIncentiveForPreview = (job: Partial<Job>, matchedTechCount: number) => {
-    const type = job.type || 'install';
-    const rails = job.rails || 0;
-    const r = rules || { baseTechPay: 250, freeRailsThreshold: 10, extraRailRate: 20, measureTechPay: 250, highLadderBonus: 100, scaffoldBonus: 200, wallLinenSqmRate: 50, wallMuralSqmRate: 75 };
-
     if (matchedTechCount === 0) return 0;
-    if (type === 'measure') return (r.measureTechPay || 250) * matchedTechCount;
-    if (type === 'install_wall_linen') return rails * (r.wallLinenSqmRate ?? 50);
-    if (type === 'install_wall_mural') return rails * (r.wallMuralSqmRate ?? 75);
-    if (['travel_go', 'travel_back', 'fix_free'].includes(type)) return 0;
-
-    const basePay = (r.baseTechPay || 250) * matchedTechCount;
-    const extraRails = rails > (r.freeRailsThreshold || 10) ? (rails - (r.freeRailsThreshold || 10)) * (r.extraRailRate || 20) : 0;
-    let specialBonus = 0;
-    if (type === 'install_high') specialBonus = r.highLadderBonus || 100;
-    if (type === 'install_scaffold' || type === 'fix_scaffold') specialBonus = r.scaffoldBonus || 200;
-
-    return basePay + extraRails + specialBonus;
+    // Create temporary dummy techs array of length matchedTechCount
+    const dummyTechs = Array.from({ length: matchedTechCount }, (_, i) => `dummy-${i}`);
+    const tempJob: Partial<Job> = { ...job, selectedTechs: dummyTechs };
+    const tempTeams: Team[] = [{
+      id: 't-preview',
+      name: 'Preview',
+      members: dummyTechs.map(id => ({ id, name: id, joinDate: '2000-01-01' }))
+    }];
+    return calculateSingleJobIncentive(tempJob, tempTeams, [], rules || DEFAULT_INCENTIVE_RULES);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -557,7 +551,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
           </thead>
           <tbody className="divide-y divide-gray-100 text-xs">
             {displayJobs.map((job, index) => {
-              const calcVal = (job as any).calculatedValue || 0;
+              const calcVal = calculateSingleJobIncentive(job, teams, leaves, rules || DEFAULT_INCENTIVE_RULES);
 
               return (
                 <tr

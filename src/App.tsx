@@ -6,7 +6,8 @@ import {
 
 import { 
   AppUser, Team, TeamMember, Job, LeaveRecord, PayPeriod, 
-  IncentiveRules, NotificationState, ConfirmModalState, LeaveTypeId 
+  IncentiveRules, NotificationState, ConfirmModalState, LeaveTypeId,
+  RuleVersion, PeriodRuleSaveOptions
 } from './types';
 
 import { 
@@ -14,7 +15,7 @@ import {
   INITIAL_TEAMS, getInitialJobs, getInitialLeaves, getInitialHolidays 
 } from './data/initialData';
 
-import { calculateIncentives } from './utils/calculator';
+import { calculateIncentives, getEffectiveRulesForPeriod, calculateSingleJobIncentive } from './utils/calculator';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { JobManagement } from './components/JobManagement';
@@ -157,6 +158,28 @@ export default function App() {
     }
   });
 
+  const [ruleVersions, setRuleVersions] = useState<RuleVersion[]>(() => {
+    try {
+      const saved = localStorage.getItem(`${APP_KEY_PREFIX}rule_versions`);
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [periodRulesMap, setPeriodRulesMap] = useState<Record<string, IncentiveRules>>(() => {
+    try {
+      const saved = localStorage.getItem(`${APP_KEY_PREFIX}period_rules_map`);
+      if (!saved) return {};
+      const parsed = JSON.parse(saved);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (e) {
+      return {};
+    }
+  });
+
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [jobSortOrder, setJobSortOrder] = useState<'asc' | 'desc' | 'manual'>('manual');
   const [notification, setNotification] = useState<NotificationState | null>(null);
@@ -286,10 +309,82 @@ export default function App() {
   // Safe Period Fallback
   const safePeriod = (period && period.start && period.end) ? period : getCurrentAutoPeriod();
 
+  // Effective Rules for the active period (supporting historical period rule versions)
+  const activeEffectiveRules = useMemo(() => {
+    return getEffectiveRulesForPeriod(safePeriod, rules, ruleVersions, periodRulesMap);
+  }, [safePeriod, rules, ruleVersions, periodRulesMap]);
+
   // Calculations
   const calcData = useMemo(() => {
-    return calculateIncentives(jobs, teams, holidays, leaves, safePeriod, rules, jobSortOrder);
-  }, [jobs, teams, holidays, leaves, safePeriod, rules, jobSortOrder]);
+    return calculateIncentives(jobs, teams, holidays, leaves, safePeriod, activeEffectiveRules, jobSortOrder);
+  }, [jobs, teams, holidays, leaves, safePeriod, activeEffectiveRules, jobSortOrder]);
+
+  // Save rules with period-scope support & automatic recalculation
+  const handleSaveRulesWithOptions = (newRules: IncentiveRules, saveOptions?: PeriodRuleSaveOptions) => {
+    const scope = saveOptions?.scope || 'from_period_onward';
+    const targetPeriodId = saveOptions?.targetPeriodId || safePeriod.id || 'current';
+    const targetPeriod = savedPeriods.find(p => p.id === targetPeriodId) || safePeriod;
+    const targetPeriodName = targetPeriod.name || 'รอบปัจจุบัน';
+    const targetStartDate = targetPeriod.start || safePeriod.start;
+
+    // 1. Update current working rules
+    setRules(newRules);
+    localStorage.setItem(`${APP_KEY_PREFIX}rules`, JSON.stringify(newRules));
+
+    // 2. Create version record
+    const newVersion: RuleVersion = {
+      id: `v_${Date.now()}`,
+      name: `สูตร ${scope === 'all_periods' ? 'ทุกรอบคำนวณ' : scope === 'specific_period_only' ? `เฉพาะรอบ ${targetPeriodName}` : `ตั้งแต่รอบ ${targetPeriodName} เป็นต้นไป`}`,
+      effectiveFromPeriodId: targetPeriodId,
+      effectiveFromPeriodName: targetPeriodName,
+      effectiveFromDate: targetStartDate,
+      scope: scope,
+      specificPeriodId: scope === 'specific_period_only' ? targetPeriodId : undefined,
+      rules: newRules,
+      createdAt: new Date().toISOString()
+    };
+
+    const updatedVersions = [newVersion, ...ruleVersions];
+    setRuleVersions(updatedVersions);
+    localStorage.setItem(`${APP_KEY_PREFIX}rule_versions`, JSON.stringify(updatedVersions));
+
+    // 3. Update period rules mapping if specific period
+    let updatedPeriodMap = { ...periodRulesMap };
+    if (scope === 'specific_period_only') {
+      updatedPeriodMap[targetPeriodId] = newRules;
+      setPeriodRulesMap(updatedPeriodMap);
+      localStorage.setItem(`${APP_KEY_PREFIX}period_rules_map`, JSON.stringify(updatedPeriodMap));
+    } else if (scope === 'all_periods') {
+      updatedPeriodMap = {};
+      setPeriodRulesMap({});
+      localStorage.removeItem(`${APP_KEY_PREFIX}period_rules_map`);
+    }
+
+    // 4. Recalculate all jobs based on their respective effective period rules
+    const updatedJobs = jobs.map(job => {
+      // Find the period corresponding to this job's date
+      const jobPeriod = savedPeriods.find(p => p.start && p.end && job.date >= p.start && job.date <= p.end) || safePeriod;
+      const jobEffectiveRules = getEffectiveRulesForPeriod(jobPeriod, newRules, updatedVersions, updatedPeriodMap);
+      const computedValue = calculateSingleJobIncentive(job, teams, leaves, jobEffectiveRules);
+      return { ...job, calculatedValue: computedValue };
+    });
+
+    setJobs(updatedJobs);
+    localStorage.setItem(`${APP_KEY_PREFIX}jobs`, JSON.stringify(updatedJobs));
+
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
+      saveToRealtimeDb({ rules: newRules, jobs: updatedJobs });
+    }
+
+    showNotification(`บันทึกสูตรคำนวณสำเร็จ (${newVersion.name}) และคำนวณยอดใหม่อัตโนมัติเรียบร้อย!`, 'success');
+  };
+
+  const handleDeleteRuleVersion = (versionId: string) => {
+    const updated = ruleVersions.filter(v => v.id !== versionId);
+    setRuleVersions(updated);
+    localStorage.setItem(`${APP_KEY_PREFIX}rule_versions`, JSON.stringify(updated));
+    showNotification('ลบเวอร์ชันสูตรเรียบร้อยแล้ว');
+  };
 
   // Auth
   const handleLogin = (e: React.FormEvent) => {
@@ -901,13 +996,14 @@ export default function App() {
       <IncentiveRulesModal
         isOpen={showRulesModal}
         onClose={() => setShowRulesModal(false)}
-        rules={rules}
-        onSaveRules={newRules => {
-          setRules(newRules);
-          showNotification('บันทึกพารามิเตอร์เกณฑ์ Incentive ใหม่เรียบร้อยแล้ว');
-        }}
+        rules={activeEffectiveRules}
+        onSaveRules={handleSaveRulesWithOptions}
         themeColor={themeColor}
         themeTextColor={themeTextColor}
+        payPeriods={savedPeriods}
+        currentPeriod={safePeriod}
+        ruleVersions={ruleVersions}
+        onDeleteRuleVersion={handleDeleteRuleVersion}
       />
 
       {/* Sticky Header Nav */}
@@ -934,7 +1030,7 @@ export default function App() {
             calcData={calcData}
             themeColor={themeColor}
             themeTextColor={themeTextColor}
-            rules={rules}
+            rules={activeEffectiveRules}
             period={safePeriod}
             holidays={holidays}
             leaves={leaves}
@@ -949,7 +1045,7 @@ export default function App() {
             jobs={jobs}
             teams={teams}
             leaves={leaves}
-            rules={rules}
+            rules={activeEffectiveRules}
             onAddJob={handleAddJob}
             onBatchAddJobs={handleBatchAddJobs}
             onUpdateJob={handleUpdateJob}

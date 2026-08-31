@@ -1,5 +1,5 @@
-import { Job, Team, LeaveRecord, PayPeriod, IncentiveRules, JobTypeId, JobTypeConfig } from '../types';
-import { JOB_TYPES, LEAVE_TYPES } from '../data/initialData';
+import { Job, Team, LeaveRecord, PayPeriod, IncentiveRules, JobTypeId, JobTypeConfig, RuleVersion } from '../types';
+import { JOB_TYPES, LEAVE_TYPES, DEFAULT_INCENTIVE_RULES } from '../data/initialData';
 
 export interface CalculatedReportRow {
   date: string;
@@ -138,6 +138,180 @@ export const getDaysArray = (startStr: string, endStr: string): string[] => {
   return arr;
 };
 
+/**
+ * Resolves the effective incentive rules for a given pay period.
+ * Supports rule versioning so historical periods retain their original formulas
+ * while newer periods use updated formulas automatically.
+ */
+export function getEffectiveRulesForPeriod(
+  period: PayPeriod,
+  currentRules: IncentiveRules,
+  ruleVersions?: RuleVersion[],
+  periodRulesMap?: Record<string, IncentiveRules>
+): IncentiveRules {
+  if (!period) return currentRules || DEFAULT_INCENTIVE_RULES;
+
+  // 1. Direct period-specific mapping by period ID or name
+  if (periodRulesMap) {
+    if (period.id && periodRulesMap[period.id]) {
+      return { ...DEFAULT_INCENTIVE_RULES, ...periodRulesMap[period.id] };
+    }
+    if (period.name && periodRulesMap[period.name]) {
+      return { ...DEFAULT_INCENTIVE_RULES, ...periodRulesMap[period.name] };
+    }
+  }
+
+  // 2. Rule versioning lookup
+  if (ruleVersions && Array.isArray(ruleVersions) && ruleVersions.length > 0) {
+    // Filter versions that apply to this period
+    // Priority:
+    // A) specific_period_only matching period.id
+    const specific = ruleVersions.find(
+      v => v.scope === 'specific_period_only' && (v.specificPeriodId === period.id || v.effectiveFromPeriodId === period.id)
+    );
+    if (specific && specific.rules) {
+      return { ...DEFAULT_INCENTIVE_RULES, ...specific.rules };
+    }
+
+    // B) from_period_onward matching period.start >= version.effectiveFromDate
+    const periodStart = period.start || '2000-01-01';
+    const onwardMatches = ruleVersions
+      .filter(v => v.scope === 'from_period_onward' && v.effectiveFromDate && periodStart >= v.effectiveFromDate)
+      .sort((a, b) => (b.effectiveFromDate || '').localeCompare(a.effectiveFromDate || '') || (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+    if (onwardMatches.length > 0 && onwardMatches[0].rules) {
+      return { ...DEFAULT_INCENTIVE_RULES, ...onwardMatches[0].rules };
+    }
+
+    // C) all_periods version (latest)
+    const allMatches = ruleVersions
+      .filter(v => v.scope === 'all_periods')
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+    if (allMatches.length > 0 && allMatches[0].rules) {
+      return { ...DEFAULT_INCENTIVE_RULES, ...allMatches[0].rules };
+    }
+  }
+
+  return currentRules || DEFAULT_INCENTIVE_RULES;
+}
+
+/**
+ * Calculates the exact incentive value (THB) for a single job based on the provided rules,
+ * active technician members, leaves, and formula configurations.
+ */
+export function calculateSingleJobIncentive(
+  job: Partial<Job>,
+  teams: Team[],
+  leaves: LeaveRecord[] = [],
+  rules: IncentiveRules = DEFAULT_INCENTIVE_RULES
+): number {
+  if (!job) return 0;
+  const safeTeams = (teams || []).filter(Boolean);
+  const safeLeaves = (leaves || []).filter(Boolean);
+  const safeRules = rules || DEFAULT_INCENTIVE_RULES;
+
+  const allConfiguredTypes: JobTypeConfig[] =
+    safeRules.customJobTypes && safeRules.customJobTypes.length > 0
+      ? safeRules.customJobTypes
+      : JOB_TYPES;
+
+  const rawVal = parseFloat(String(job.rails ?? 0));
+  const railsOrSqm = isNaN(rawVal) ? 0 : Math.max(0, Math.round(rawVal * 10) / 10);
+  const jobDate = job.date || '';
+
+  // Filter valid techs: person existed and active on that day
+  const validTechs = (job.selectedTechs || []).filter(tid => {
+    let memberRecord = null;
+    for (const t of safeTeams) {
+      const found = (t?.members || []).find(m => m && m.id === tid);
+      if (found) {
+        memberRecord = found;
+        break;
+      }
+    }
+    if (!memberRecord) return false;
+
+    const isJoined = !memberRecord.joinDate || !jobDate || memberRecord.joinDate <= jobDate;
+    const isResigned = memberRecord.resignDate && jobDate && jobDate >= memberRecord.resignDate;
+    return isJoined && !isResigned;
+  });
+
+  // Filter techs who earn incentive (exclude 'no_inc')
+  const payingTechs = validTechs.filter(tid => {
+    const l = safeLeaves.find(x => x && x.techId === tid && x.date === jobDate);
+    return !(l && l.type === 'no_inc');
+  });
+
+  const cnt = payingTechs.length;
+  if (cnt === 0) return 0;
+
+  const jobType = job.type || 'install';
+  const currentTypeConfig = allConfiguredTypes.find(t => t.id === jobType);
+
+  if (jobType === 'measure') {
+    const measurePay = safeRules.measureTechPay !== undefined ? safeRules.measureTechPay : (currentTypeConfig?.fixedAmount ?? 250);
+    return measurePay * cnt;
+  }
+  if (jobType === 'install_wall_linen') {
+    const rate = safeRules.wallLinenSqmRate !== undefined ? safeRules.wallLinenSqmRate : (currentTypeConfig?.ratePerUnit ?? 50);
+    const attendance = safeRules.wallLinenAttendancePay !== undefined ? safeRules.wallLinenAttendancePay : (currentTypeConfig?.baseAttendancePerTech ?? 0);
+    return (railsOrSqm * rate) + (attendance * cnt);
+  }
+  if (jobType === 'install_wall_mural') {
+    const rate = safeRules.wallMuralSqmRate !== undefined ? safeRules.wallMuralSqmRate : (currentTypeConfig?.ratePerUnit ?? 75);
+    const attendance = safeRules.wallMuralAttendancePay !== undefined ? safeRules.wallMuralAttendancePay : (currentTypeConfig?.baseAttendancePerTech ?? 0);
+    return (railsOrSqm * rate) + (attendance * cnt);
+  }
+  if (['travel_go', 'travel_back', 'fix_free'].includes(jobType) || currentTypeConfig?.calcFormulaType === 'free_no_pay') {
+    return 0;
+  }
+
+  if (currentTypeConfig) {
+    if (currentTypeConfig.calcFormulaType === 'rate_per_sqm' || currentTypeConfig.calcFormulaType === 'rate_per_unit') {
+      const rate = currentTypeConfig.ratePerUnit ?? 50;
+      const attendance = currentTypeConfig.baseAttendancePerTech ?? 0;
+      return (railsOrSqm * rate) + (attendance * cnt);
+    }
+    if (currentTypeConfig.calcFormulaType === 'fixed_per_tech') {
+      const fixedAmt = currentTypeConfig.fixedAmount ?? safeRules.measureTechPay ?? 250;
+      return fixedAmt * cnt;
+    }
+    if (currentTypeConfig.calcFormulaType === 'fixed_per_job') {
+      return currentTypeConfig.fixedAmount ?? 0;
+    }
+
+    // Standard curtain formula with custom job type overrides
+    const basePayPerTech = safeRules.baseTechPay !== undefined ? safeRules.baseTechPay : (currentTypeConfig.baseAttendancePerTech ?? 250);
+    const basePay = basePayPerTech * cnt;
+    const freeRails = safeRules.freeRailsThreshold !== undefined ? safeRules.freeRailsThreshold : 10;
+    const extraRate = safeRules.extraRailRate !== undefined ? safeRules.extraRailRate : 20;
+    const extraRails = railsOrSqm > freeRails ? (railsOrSqm - freeRails) * extraRate : 0;
+
+    let specialBonus = 0;
+    if (jobType === 'install_high') {
+      specialBonus = safeRules.highLadderBonus !== undefined ? safeRules.highLadderBonus : (currentTypeConfig.bonusAmount ?? 0);
+    } else if (jobType === 'install_scaffold' || jobType === 'fix_scaffold') {
+      specialBonus = safeRules.scaffoldBonus !== undefined ? safeRules.scaffoldBonus : (currentTypeConfig.bonusAmount ?? 0);
+    } else {
+      specialBonus = currentTypeConfig.bonusAmount ?? 0;
+    }
+
+    return basePay + extraRails + specialBonus;
+  }
+
+  // Fallback standard curtain formula
+  const basePay = (safeRules.baseTechPay ?? 250) * cnt;
+  const freeRails = safeRules.freeRailsThreshold ?? 10;
+  const extraRate = safeRules.extraRailRate ?? 20;
+  const extraRails = railsOrSqm > freeRails ? (railsOrSqm - freeRails) * extraRate : 0;
+  let specialBonus = 0;
+  if (jobType === 'install_high') specialBonus = safeRules.highLadderBonus ?? 0;
+  if (jobType === 'install_scaffold' || jobType === 'fix_scaffold') specialBonus = safeRules.scaffoldBonus ?? 0;
+
+  return basePay + extraRails + specialBonus;
+}
+
 export function calculateIncentives(
   jobs: Job[],
   teams: Team[],
@@ -152,19 +326,7 @@ export function calculateIncentives(
   const safeJobs = (jobs || []).filter(Boolean);
   const safeLeaves = (leaves || []).filter(Boolean);
   const safeHolidays = (holidays || []).filter(Boolean);
-  const safeRules = rules || {
-    baseTechPay: 250,
-    freeRailsThreshold: 10,
-    extraRailRate: 20,
-    measureTechPay: 250,
-    highLadderBonus: 100,
-    scaffoldBonus: 200,
-    wallLinenSqmRate: 50,
-    wallMuralSqmRate: 75,
-    wallLinenAttendancePay: 0,
-    wallMuralAttendancePay: 0,
-    customJobTypes: JOB_TYPES
-  };
+  const safeRules = rules || DEFAULT_INCENTIVE_RULES;
 
   const allConfiguredTypes: JobTypeConfig[] = (safeRules.customJobTypes && safeRules.customJobTypes.length > 0)
     ? safeRules.customJobTypes
@@ -199,7 +361,9 @@ export function calculateIncentives(
 
   // 1. Process each job to compute calculatedValue and split into teams
   safeJobs.forEach(job => {
-    let val = 0;
+    // Calculate single job incentive using shared pure function
+    const val = calculateSingleJobIncentive(job, safeTeams, safeLeaves, safeRules);
+
     // Allow 1 decimal place float (e.g. 12.5)
     const rawVal = parseFloat(String(job.rails));
     const railsOrSqm = isNaN(rawVal) ? 0 : Math.max(0, Math.round(rawVal * 10) / 10);
@@ -246,62 +410,11 @@ export function calculateIncentives(
 
     const cnt = payingTechs.length;
 
-    if (cnt === 0) {
-      val = 0;
-    } else {
-      // Calculation logic based on job type
-      if (job.type === 'measure') {
-        val = (safeRules.measureTechPay || 250) * cnt;
-      } else if (job.type === 'install_wall_linen') {
-        const rate = safeRules.wallLinenSqmRate ?? 50;
-        const attendance = safeRules.wallLinenAttendancePay ?? 0;
-        val = (railsOrSqm * rate) + (attendance * cnt);
-      } else if (job.type === 'install_wall_mural') {
-        const rate = safeRules.wallMuralSqmRate ?? 75;
-        const attendance = safeRules.wallMuralAttendancePay ?? 0;
-        val = (railsOrSqm * rate) + (attendance * cnt);
-      } else if (['travel_go', 'travel_back', 'fix_free'].includes(job.type)) {
-        val = 0;
-      } else if (currentTypeConfig) {
-        // Custom job type handling
-        if (currentTypeConfig.calcFormulaType === 'free_no_pay') {
-          val = 0;
-        } else if (currentTypeConfig.calcFormulaType === 'rate_per_sqm' || currentTypeConfig.calcFormulaType === 'rate_per_unit') {
-          const rate = currentTypeConfig.ratePerUnit ?? 50;
-          const attendance = currentTypeConfig.baseAttendancePerTech ?? 0;
-          val = (railsOrSqm * rate) + (attendance * cnt);
-        } else if (currentTypeConfig.calcFormulaType === 'fixed_per_tech') {
-          val = (currentTypeConfig.fixedAmount ?? 250) * cnt;
-        } else if (currentTypeConfig.calcFormulaType === 'fixed_per_job') {
-          val = (currentTypeConfig.fixedAmount ?? 0);
-        } else {
-          // Standard curtain formula with optional bonus
-          const basePay = (currentTypeConfig.baseAttendancePerTech ?? safeRules.baseTechPay ?? 250) * cnt;
-          const extraRails = railsOrSqm > (safeRules.freeRailsThreshold ?? 10)
-            ? (railsOrSqm - (safeRules.freeRailsThreshold ?? 10)) * (safeRules.extraRailRate ?? 20)
-            : 0;
-          const specialBonus = currentTypeConfig.bonusAmount ?? 0;
-          val = basePay + extraRails + specialBonus;
-        }
-      } else {
-        // Fallback standard curtain formula
-        const basePay = (safeRules.baseTechPay || 250) * cnt;
-        const extraRails = railsOrSqm > (safeRules.freeRailsThreshold || 10)
-          ? (railsOrSqm - (safeRules.freeRailsThreshold || 10)) * (safeRules.extraRailRate || 20)
-          : 0;
-        let specialBonus = 0;
-        if (job.type === 'install_high') specialBonus = safeRules.highLadderBonus || 100;
-        if (job.type === 'install_scaffold' || job.type === 'fix_scaffold') specialBonus = safeRules.scaffoldBonus || 200;
-
-        val = basePay + extraRails + specialBonus;
-      }
-    }
-
     // Attach to job temporarily
     (job as Job & { calculatedValue?: number }).calculatedValue = val;
 
     // Distribute to teams involved
-    if (isInPeriod && cnt > 0) {
+    if (isInPeriod && cnt > 0 && val > 0) {
       const teamsInvolved: Record<string, number> = {};
       payingTechs.forEach(tid => {
         const t = safeTeams.find(x => (x?.members || []).some(m => m && m.id === tid));
