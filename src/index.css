@@ -1,144 +1,165 @@
 @import "tailwindcss";
 
-@layer utilities {
-  @media print {
-    *, *::before, *::after {
-      box-sizing: border-box !important;
-      text-shadow: none !important;
-      box-shadow: none !important;
-    }
-
-    body {
-      background-color: #ffffff !important;
-      color: #000000 !important;
-      font-size: 8.5pt !important;
-      font-family: 'Sarabun', 'Prompt', system-ui, -apple-system, sans-serif !important;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
-
-    .no-print, header, nav, button, .toast-notification, .no-print-zone {
-      display: none !important;
-    }
-
-    /* Remove scroll wrappers that break Blink/WebKit PDF table pagination */
-    div, section, article, main, .overflow-x-auto, .overflow-y-auto, .overflow-auto {
-      overflow: visible !important;
-      height: auto !important;
-      max-height: none !important;
-    }
-
-    main {
-      max-width: 100% !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      width: 100% !important;
-    }
-
-    .print-clean-container {
-      border: none !important;
-      box-shadow: none !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      background: transparent !important;
-      width: 100% !important;
-    }
-
-    @page {
-      size: A4 portrait;
-      margin: 6mm 6mm 8mm 6mm;
-    }
-
-    table, .report-table {
-      display: table !important;
-      width: 100% !important;
-      border-collapse: collapse !important;
-      page-break-inside: auto !important;
-      break-inside: auto !important;
-    }
-
-    thead, .report-table thead {
-      display: table-header-group !important;
-    }
-
-    tfoot, .report-table tfoot {
-      display: table-footer-group !important;
-    }
-
-    tbody, .report-table tbody {
-      display: table-row-group !important;
-    }
-
-    tr, .report-table tr {
-      break-inside: avoid !important;
-      page-break-inside: avoid !important;
-      page-break-after: auto !important;
-    }
-
-    .report-table th, 
-    .report-table td {
-      border: 1px solid #94a3b8 !important;
-      padding: 3.5px 5px !important;
-      font-size: 8pt !important;
-      line-height: 1.2 !important;
-      color: #0f172a !important;
-    }
-
-    .print-header-row td,
-    .print-header-row th {
-      border: none !important;
-      padding: 0 0 4px 0 !important;
-      background-color: transparent !important;
-      font-weight: normal !important;
-    }
-
-    .print-bordered-box {
-      border: 1px solid #94a3b8 !important;
-    }
-
-    .report-table th {
-      background-color: #f1f5f9 !important;
-      font-weight: 700 !important;
-      color: #0f172a !important;
-    }
-
-    /* In print, disable sticky headers and remove scroll/overflow bounds */
-    .report-table thead tr.table-column-header th {
-      position: static !important;
-      top: auto !important;
-      box-shadow: none !important;
-    }
-
-    .report-scroll-container {
-      overflow: visible !important;
-      max-height: none !important;
-      height: auto !important;
-      display: block !important;
-      width: 100% !important;
-    }
-
-    .print-signature-block {
-      break-inside: avoid !important;
-      page-break-inside: avoid !important;
-      margin-top: 1.5rem !important;
-    }
+@media print {
+  *, *::before, *::after {
+    box-sizing: border-box !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
   }
 
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-size: 8.5pt !important;
+    font-family: 'Sarabun', 'Prompt', system-ui, -apple-system, sans-serif !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .no-print, header, nav, button, .toast-notification, .no-print-zone {
+    display: none !important;
+  }
+
+  /* Force all ancestor containers to be completely unconstrained so Chrome repeats thead */
+  html, body, #root, #root > div, main, .print-clean-container, .report-scroll-container, section, article, div {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    position: static !important;
+  }
+
+  main {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  .print-clean-container {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    width: 100% !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 6mm 6mm 8mm 6mm;
+  }
+
+  table, .report-table {
+    display: table !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+    background-color: transparent !important;
+  }
+
+  thead, .report-table thead {
+    display: table-header-group !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  thead tr, .report-table thead tr {
+    display: table-row !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  thead th, .report-table thead th {
+    display: table-cell !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    background-color: transparent !important;
+  }
+
+  tfoot, .report-table tfoot {
+    display: table-footer-group !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  tbody, .report-table tbody {
+    display: table-row-group !important;
+  }
+
+  tr, .report-table tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+    background-color: transparent !important;
+  }
+
+  .report-table th, 
+  .report-table td {
+    border: 1px solid #94a3b8 !important;
+    padding: 3.5px 5px !important;
+    font-size: 8pt !important;
+    line-height: 1.2 !important;
+    color: #0f172a !important;
+    background-color: transparent !important;
+  }
+
+  .print-header-row,
+  .print-header-row td,
+  .print-header-row th {
+    border: none !important;
+    padding: 0 0 4px 0 !important;
+    background-color: transparent !important;
+    font-weight: normal !important;
+  }
+
+  .print-header-row * {
+    background-color: transparent !important;
+  }
+
+  .print-bordered-box {
+    border: none !important;
+    background-color: transparent !important;
+  }
+
+  /* In print, disable sticky headers and remove scroll/overflow bounds */
   .report-table thead tr.table-column-header th {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background-color: #f1f5f9;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    position: static !important;
+    top: auto !important;
+    box-shadow: none !important;
+    background-color: transparent !important;
   }
 
   .report-scroll-container {
-    max-height: calc(100vh - 160px);
-    overflow-y: auto;
-    overflow-x: auto;
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    display: block !important;
+    width: 100% !important;
   }
+
+  .print-signature-block {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-top: 1rem !important;
+  }
+}
+
+.report-table thead tr.table-column-header th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.report-scroll-container {
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+  overflow-x: auto;
 }
 
 
