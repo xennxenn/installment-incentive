@@ -97,27 +97,62 @@
     background-color: transparent !important;
   }
 
+  /* Force 100% background transparency everywhere in print */
+  *, *::before, *::after {
+    background-color: transparent !important;
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html, body, #root {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+  }
+
+  /* ลบเส้นกรอบที่ไม่ใช่เส้นตารางออกทั้งหมด: Only actual table cells have borders */
+  *:not(.report-table, .report-table tbody td, .report-table tbody th, .report-table tfoot td, .report-table tfoot th, .report-table thead tr.table-column-header th) {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    outline: none !important;
+  }
+
+  .report-table {
+    border-collapse: collapse !important;
+    border: 1px solid #64748b !important;
+  }
+
   .report-table th, 
   .report-table td {
-    border: 1px solid #94a3b8 !important;
+    border: 1px solid #64748b !important;
     padding: 3.5px 5px !important;
     font-size: 8pt !important;
-    line-height: 1.2 !important;
+    line-height: 1.25 !important;
     color: #0f172a !important;
     background-color: transparent !important;
   }
 
+  /* The header row inside thead must NEVER have any border */
+  .report-table thead tr.print-header-row,
+  .report-table thead tr.print-header-row th,
+  .report-table thead tr.print-header-row td,
   .print-header-row,
-  .print-header-row td,
-  .print-header-row th {
+  .print-header-row *,
+  .print-header-cell,
+  .print-header-cell * {
     border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
     padding: 0 0 4px 0 !important;
     background-color: transparent !important;
     font-weight: normal !important;
-  }
-
-  .print-header-row * {
-    background-color: transparent !important;
+    box-shadow: none !important;
   }
 
   .print-bordered-box {
@@ -131,6 +166,7 @@
     top: auto !important;
     box-shadow: none !important;
     background-color: transparent !important;
+    border: 1px solid #64748b !important;
   }
 
   .report-scroll-container {
@@ -144,7 +180,8 @@
   .print-signature-block {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
-    margin-top: 1rem !important;
+    border: none !important;
+    margin-top: 1.5rem !important;
   }
 }
 

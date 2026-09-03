@@ -951,7 +951,7 @@ export default function App() {
 
   // --- Main Application View ---
   return (
-    <div className="min-h-screen bg-gray-50/60 text-sm font-sans text-gray-800 pb-20 relative">
+    <div className={`min-h-screen text-sm font-sans text-gray-800 pb-20 relative ${activeTab === 'reports' ? 'bg-white' : 'bg-gray-50/60'}`}>
       {/* Toast Notification */}
       {notification && (
         <div
@@ -1024,7 +1024,7 @@ export default function App() {
       />
 
       {/* Main Tab Contents */}
-      <main className={`w-full px-3 md:px-6 py-6 ${activeTab !== 'reports' ? 'no-print' : ''}`}>
+      <main className={`w-full ${activeTab === 'reports' ? 'px-0 md:px-4 py-2 bg-white' : 'px-3 md:px-6 py-6'} ${activeTab !== 'reports' ? 'no-print' : ''}`}>
         {activeTab === 'dashboard' && (
           <Dashboard
             calcData={calcData}

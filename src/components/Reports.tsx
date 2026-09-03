@@ -163,44 +163,32 @@ export const Reports: React.FC<ReportsProps> = ({
         {/* 0. Overview Report View */}
         {reportType === 'overview' && (
           <div className="report-scroll-container">
-            {/* Section 1: Team Summary Table with repeating thead */}
             <table className="report-table w-full text-left text-xs border-collapse border border-gray-300 bg-transparent">
               <thead>
+                {/* Document Header Row (Repeating on every page) - Clean Flex without nested tables */}
                 <tr className="print-header-row">
-                  <th colSpan={7} className="border-none p-0 pb-2 font-normal text-left bg-transparent">
-                    <div className="border-b-2 border-gray-900 pb-2 mb-2">
-                      <table className="w-full border-none border-collapse text-left m-0 p-0 bg-transparent">
-                        <tbody>
-                          <tr>
-                            <td className="border-none p-0 align-top bg-transparent">
-                              <table className="border-none border-collapse bg-transparent">
-                                <tbody>
-                                  <tr>
-                                    <td className="border-none p-0 pr-3 align-middle w-12 bg-transparent">
-                                      <img src={LOGO_URL} alt="PASAYA" className="h-[46px] w-auto object-contain block" />
-                                    </td>
-                                    <td className="border-none p-0 align-middle bg-transparent">
-                                      <h2 className="font-extrabold text-xs md:text-sm text-gray-900 tracking-tight leading-tight">
-                                        บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
-                                      </h2>
-                                      <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
-                                        77/191-192 อาคารสินสาธรทาวเวอร์ ชั้น 42 ถนนกรุงธนบุรี แขวงคลองต้นไทร เขตคลองสาน กรุงเทพฯ 10600 (สํานักงานใหญ่)
-                                      </p>
-                                      <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
-                                        เลขประจําตัวผู้เสียภาษี 0105546015615 โทร: 0-2440-0955 แฟ็กซ์: 0-2440-0933-4
-                                      </p>
-                                    </td>
-                                  </tr>
-                                </tbody>
-                              </table>
-                            </td>
-                            <td className="border-none p-0 align-top text-right text-[11px] leading-tight whitespace-nowrap bg-transparent">
-                              <div><strong className="text-gray-900">เลขที่เอกสาร:</strong> INC-OV-{(period?.id || '2026').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}</div>
-                              <div><strong className="text-gray-900">วันที่ออกเอกสาร:</strong> {issueDateStr}</div>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
+                  <th colSpan={7} className="print-header-cell border-none p-0 pb-2 font-normal text-left bg-transparent">
+                    <div className="pb-2 mb-2">
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex items-start gap-3">
+                          <img src={LOGO_URL} alt="PASAYA" className="h-[44px] w-auto object-contain block flex-shrink-0" />
+                          <div className="text-gray-900 leading-tight space-y-0.5">
+                            <h2 className="font-extrabold text-xs md:text-sm text-gray-900 tracking-tight leading-tight">
+                              บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
+                            </h2>
+                            <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
+                              77/191-192 อาคารสินสาธรทาวเวอร์ ชั้น 42 ถนนกรุงธนบุรี แขวงคลองต้นไทร เขตคลองสาน กรุงเทพฯ 10600 (สํานักงานใหญ่)
+                            </p>
+                            <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
+                              เลขประจําตัวผู้เสียภาษี 0105546015615 โทร: 0-2440-0955 แฟ็กซ์: 0-2440-0933-4
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right text-[11px] leading-tight whitespace-nowrap text-gray-800 flex-shrink-0">
+                          <div><strong className="text-gray-900">เลขที่เอกสาร:</strong> INC-OV-{(period?.id || '2026').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}</div>
+                          <div><strong className="text-gray-900">วันที่ออกเอกสาร:</strong> {issueDateStr}</div>
+                        </div>
+                      </div>
 
                       <div className="text-center mt-2 space-y-0.5">
                         <h1 className="font-black text-base text-gray-900 tracking-tight leading-tight">
@@ -210,69 +198,57 @@ export const Reports: React.FC<ReportsProps> = ({
                           ประจำรอบการคำนวณ: <span className="text-gray-900 font-bold">{period?.name || ''}</span> ({formatDateTH(period?.start || '')} ถึง {formatDateTH(period?.end || '')})
                         </p>
                       </div>
-                    </div>
 
-                    {/* Overall Metrics Key KPIs Row - No borders, no background */}
-                    <table className="w-full border-none border-collapse text-xs mb-2 text-center bg-transparent">
-                      <tbody>
-                        <tr>
-                          <td className="border-none p-1 text-left bg-transparent">
-                            <span className="text-gray-500 block text-[10px]">Incentive รวมทั้งสิ้น</span>
-                            <strong className="text-sm md:text-base text-emerald-800 font-black">
-                              ฿{calcData.totalIncentive.toLocaleString()}
-                            </strong>
-                          </td>
-                          <td className="border-none p-1 text-center bg-transparent">
-                            <span className="text-gray-500 block text-[10px]">จำนวนรางรวม</span>
-                            <strong className="text-sm font-bold text-gray-900">
-                              {calcData.totalRails.toLocaleString()} <span className="text-[10px] font-normal text-gray-500">ราง</span>
-                            </strong>
-                          </td>
-                          <td className="border-none p-1 text-center bg-transparent">
-                            <span className="text-gray-500 block text-[10px]">งานวัดพื้นที่</span>
-                            <strong className="text-sm font-bold text-purple-800">
-                              {calcData.totalMeasureJobs} <span className="text-[10px] font-normal text-gray-500">งาน</span>
-                            </strong>
-                          </td>
-                          <td className="border-none p-1 text-center bg-transparent">
-                            <span className="text-gray-500 block text-[10px]">จำนวนช่าง</span>
-                            <strong className="text-sm font-bold text-amber-800">
-                              {calcData.totalTechs} <span className="text-[10px] font-normal text-gray-500">คน</span>
-                            </strong>
-                          </td>
-                          <td className="border-none p-1 text-center bg-transparent">
-                            <span className="text-gray-500 block text-[10px]">จำนวนงานรวม</span>
-                            <strong className="text-sm font-bold text-indigo-800">
-                              {calcData.periodJobs.length} <span className="text-[10px] font-normal text-gray-500">งาน</span>
-                            </strong>
-                          </td>
-                          <td className="border-none p-1 text-right bg-transparent">
-                            <span className="text-gray-500 block text-[10px]">วันทำการในรอบ</span>
-                            <strong className="text-sm font-bold text-rose-800">
-                              {calcData.periodWorkingDays} <span className="text-[10px] font-normal text-gray-500">วัน</span>
-                            </strong>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-
-                    <div className="font-extrabold text-xs text-gray-900 py-1 border-b border-gray-300 flex justify-between items-center mb-1">
-                      <span>ส่วนที่ 1: สรุปผลงานและยอด Incentive แยกตามทีมช่าง</span>
-                      <span className="text-[11px] font-normal text-gray-600">ทั้งหมด {calcData.teamStats.length} ทีม</span>
+                      {/* Overall Key KPIs Metrics Line - clean borderless flex */}
+                      <div className="flex justify-between items-center text-xs mt-2 pt-1.5 px-1 text-gray-800 font-medium">
+                        <div>
+                          <span className="text-gray-500 text-[10px] block">ยอด Incentive รวมทั้งสิ้น:</span>
+                          <strong className="text-sm font-black text-emerald-800">฿{calcData.totalIncentive.toLocaleString()}</strong>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-gray-500 text-[10px] block">ปริมาณรางรวม:</span>
+                          <strong className="text-xs font-bold text-gray-900">{calcData.totalRails.toLocaleString()} ราง</strong>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-gray-500 text-[10px] block">งานวัดพื้นที่:</span>
+                          <strong className="text-xs font-bold text-purple-800">{calcData.totalMeasureJobs} งาน</strong>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-gray-500 text-[10px] block">จำนวนช่างปฏิบัติงาน:</span>
+                          <strong className="text-xs font-bold text-amber-800">{calcData.totalTechs} คน</strong>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-gray-500 text-[10px] block">จำนวนงานรวม:</span>
+                          <strong className="text-xs font-bold text-indigo-800">{calcData.periodJobs.length} งาน</strong>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-gray-500 text-[10px] block">วันทำการในรอบ:</span>
+                          <strong className="text-xs font-bold text-rose-800">{calcData.periodWorkingDays} วัน</strong>
+                        </div>
+                      </div>
                     </div>
                   </th>
                 </tr>
+
+                {/* Unified 7 Column Headers */}
                 <tr className="text-gray-900 font-bold border-b border-gray-400 table-column-header bg-transparent">
                   <th className="border border-gray-300 py-1.5 px-2 text-center w-10 bg-transparent">ลำดับ</th>
-                  <th className="border border-gray-300 py-1.5 px-2 text-left bg-transparent">ทีมช่างปฏิบัติงาน</th>
-                  <th className="border border-gray-300 py-1.5 px-2 text-center w-24 bg-transparent">สมาชิกช่าง (คน)</th>
-                  <th className="border border-gray-300 py-1.5 px-2 text-center w-24 bg-transparent">งานที่ทำ (งาน)</th>
-                  <th className="border border-gray-300 py-1.5 px-2 text-center w-28 bg-transparent">ปริมาณราง (ราง)</th>
-                  <th className="border border-gray-300 py-1.5 px-2 text-right w-36 bg-transparent">Incentive ทีม (บาท)</th>
-                  <th className="border border-gray-300 py-1.5 px-2 text-right w-24 bg-transparent">สัดส่วน (%)</th>
+                  <th className="border border-gray-300 py-1.5 px-2 text-left bg-transparent">รายการ / ทีมช่าง / ช่างปฏิบัติงาน</th>
+                  <th className="border border-gray-300 py-1.5 px-2 text-center w-32 bg-transparent">สมาชิก / สังกัดทีม</th>
+                  <th className="border border-gray-300 py-1.5 px-2 text-center w-24 bg-transparent">งานที่ทำ / วันทำงาน</th>
+                  <th className="border border-gray-300 py-1.5 px-2 text-center w-28 bg-transparent">ปริมาณรวม</th>
+                  <th className="border border-gray-300 py-1.5 px-2 text-right w-36 bg-transparent">Incentive (บาท)</th>
+                  <th className="border border-gray-300 py-1.5 px-2 text-right w-20 bg-transparent">สัดส่วน (%)</th>
                 </tr>
               </thead>
+
               <tbody className="bg-transparent">
+                {/* Section 1: Team Summary */}
+                <tr className="bg-transparent">
+                  <td colSpan={7} className="border border-gray-300 py-1.5 px-2 text-left font-black text-gray-900 text-xs bg-transparent">
+                    ส่วนที่ 1: สรุปผลงานและยอด Incentive แยกตามทีมช่าง (ทั้งหมด {calcData.teamStats.length} ทีม)
+                  </td>
+                </tr>
                 {calcData.teamStats.map((team, idx) => {
                   const teamJobCount = (calcData.reportTeamLogs[team.id]?.rows || []).filter(r => !r.isHoliday).length;
                   const percentage = calcData.totalIncentive > 0
@@ -284,49 +260,31 @@ export const Reports: React.FC<ReportsProps> = ({
                       <td className="border border-gray-300 py-1.5 px-2 font-bold text-gray-900 bg-transparent">{team.name}</td>
                       <td className="border border-gray-300 py-1.5 px-2 text-center font-semibold text-gray-800 bg-transparent">{(team.members || []).length} คน</td>
                       <td className="border border-gray-300 py-1.5 px-2 text-center font-semibold text-gray-800 bg-transparent">{teamJobCount} งาน</td>
-                      <td className="border border-gray-300 py-1.5 px-2 text-center font-bold text-gray-900 bg-transparent">{(team.totalRails || 0).toLocaleString()}</td>
+                      <td className="border border-gray-300 py-1.5 px-2 text-center font-bold text-gray-900 bg-transparent">{(team.totalRails || 0).toLocaleString()} ราง</td>
                       <td className="border border-gray-300 py-1.5 px-2 text-right font-black text-emerald-800 bg-transparent">฿{Math.round(team.totalEarned || 0).toLocaleString()}</td>
                       <td className="border border-gray-300 py-1.5 px-2 text-right font-semibold text-gray-700 bg-transparent">{percentage}%</td>
                     </tr>
                   );
                 })}
-              </tbody>
-              <tfoot className="bg-transparent">
-                <tr className="font-bold border-t border-b-2 border-gray-400 bg-transparent">
+                <tr className="font-bold border-t border-b border-gray-400 bg-transparent">
                   <td colSpan={3} className="border border-gray-300 py-1.5 px-2 text-right font-black text-gray-900 bg-transparent">รวมผลงานทีมทั้งหมด:</td>
                   <td className="border border-gray-300 py-1.5 px-2 text-center font-black text-gray-900 bg-transparent">{calcData.periodJobs.length} งาน</td>
-                  <td className="border border-gray-300 py-1.5 px-2 text-center font-black text-blue-900 bg-transparent">{calcData.totalRails.toLocaleString()}</td>
+                  <td className="border border-gray-300 py-1.5 px-2 text-center font-black text-blue-900 bg-transparent">{calcData.totalRails.toLocaleString()} ราง</td>
                   <td className="border border-gray-300 py-1.5 px-2 text-right font-black text-emerald-800 text-sm bg-transparent">฿{calcData.totalIncentive.toLocaleString()}</td>
                   <td className="border border-gray-300 py-1.5 px-2 text-right font-black text-gray-900 bg-transparent">100%</td>
                 </tr>
-              </tfoot>
-            </table>
 
-            {/* Section 2: Job Type Summary Table with repeating thead */}
-            <table className="report-table w-full text-left text-xs border-collapse border border-gray-300 mt-4 bg-transparent">
-              <thead>
-                <tr>
-                  <th colSpan={6} className="border-none p-0 font-normal text-left bg-transparent">
-                    <div className="font-extrabold text-xs text-gray-900 py-1 border-b border-gray-300 flex justify-between items-center mb-1">
-                      <span>ส่วนที่ 2: สรุปสัดส่วนผลงานแยกตามประเภทงาน (Job Type Analytics)</span>
-                      <span className="text-[11px] font-normal text-gray-600">ทั้งหมด {overallStats.length} ประเภทงาน</span>
-                    </div>
-                  </th>
+                {/* Section 2: Job Types Summary */}
+                <tr className="bg-transparent">
+                  <td colSpan={7} className="border border-gray-300 py-1.5 px-2 text-left font-black text-gray-900 text-xs bg-transparent pt-3">
+                    ส่วนที่ 2: สรุปสัดส่วนผลงานแยกตามประเภทงาน (Job Type Analytics - ทั้งหมด {overallStats.length} ประเภทงาน)
+                  </td>
                 </tr>
-                <tr className="text-gray-900 font-bold border-b border-gray-400 table-column-header bg-transparent">
-                  <th className="border border-gray-300 py-1.5 px-2 text-center w-10 bg-transparent">ลำดับ</th>
-                  <th className="border border-gray-300 py-1.5 px-2 text-left bg-transparent">ประเภทงาน (Job Type)</th>
-                  <th className="border border-gray-300 py-1.5 px-2 text-center w-24 bg-transparent">จำนวนงาน (Jobs)</th>
-                  <th className="border border-gray-300 py-1.5 px-2 text-center w-28 bg-transparent">ปริมาณรวม</th>
-                  <th className="border border-gray-300 py-1.5 px-2 text-right w-36 bg-transparent">Incentive รวม (บาท)</th>
-                  <th className="border border-gray-300 py-1.5 px-2 text-right w-24 bg-transparent">สัดส่วน (%)</th>
-                </tr>
-              </thead>
-              <tbody className="bg-transparent">
                 {overallStats.map((item, idx) => (
                   <tr key={item.typeId} className="bg-transparent">
                     <td className="border border-gray-300 py-1.5 px-2 text-center text-gray-600 font-medium bg-transparent">{idx + 1}</td>
                     <td className="border border-gray-300 py-1.5 px-2 font-bold text-gray-900 bg-transparent">{item.label}</td>
+                    <td className="border border-gray-300 py-1.5 px-2 text-center text-gray-500 bg-transparent">-</td>
                     <td className="border border-gray-300 py-1.5 px-2 text-center font-semibold text-gray-800 bg-transparent">{item.jobCount} งาน</td>
                     <td className="border border-gray-300 py-1.5 px-2 text-center font-bold text-gray-900 bg-transparent">
                       {item.totalQuantity > 0 ? `${item.totalQuantity.toLocaleString()} ${item.unitLabel}` : '-'}
@@ -339,39 +297,20 @@ export const Reports: React.FC<ReportsProps> = ({
                     </td>
                   </tr>
                 ))}
-              </tbody>
-              <tfoot className="bg-transparent">
-                <tr className="font-bold border-t border-b-2 border-gray-400 bg-transparent">
-                  <td colSpan={2} className="border border-gray-300 py-1.5 px-2 text-right font-black text-gray-900 bg-transparent">รวมผลงานทุกประเภท:</td>
+                <tr className="font-bold border-t border-b border-gray-400 bg-transparent">
+                  <td colSpan={3} className="border border-gray-300 py-1.5 px-2 text-right font-black text-gray-900 bg-transparent">รวมผลงานทุกประเภท:</td>
                   <td className="border border-gray-300 py-1.5 px-2 text-center font-black text-blue-900 bg-transparent">{overallStats.reduce((s, i) => s + i.jobCount, 0)} งาน</td>
-                  <td className="border border-gray-300 py-1.5 px-2 bg-transparent"></td>
+                  <td className="border border-gray-300 py-1.5 px-2 bg-transparent text-center text-gray-500">-</td>
                   <td className="border border-gray-300 py-1.5 px-2 text-right font-black text-emerald-800 text-sm bg-transparent">฿{Math.round(overallStats.reduce((s, i) => s + i.totalIncentive, 0)).toLocaleString()}</td>
                   <td className="border border-gray-300 py-1.5 px-2 text-right font-black text-gray-900 bg-transparent">100%</td>
                 </tr>
-              </tfoot>
-            </table>
 
-            {/* Section 3: Individual Technician Summary Table with repeating thead */}
-            <table className="report-table w-full text-left text-xs border-collapse border border-gray-300 mt-4 bg-transparent">
-              <thead>
-                <tr>
-                  <th colSpan={6} className="border-none p-0 font-normal text-left bg-transparent">
-                    <div className="font-extrabold text-xs text-gray-900 py-1 border-b border-gray-300 flex justify-between items-center mb-1">
-                      <span>ส่วนที่ 3: สรุปผลตอบแทนสวัสดิการช่างรายบุคคล (Individual Technician Earnings)</span>
-                      <span className="text-[11px] font-normal text-gray-600">ทั้งหมด {calcData.individualStats.length} คน</span>
-                    </div>
-                  </th>
+                {/* Section 3: Individual Technician Summary */}
+                <tr className="bg-transparent">
+                  <td colSpan={7} className="border border-gray-300 py-1.5 px-2 text-left font-black text-gray-900 text-xs bg-transparent pt-3">
+                    ส่วนที่ 3: สรุปผลตอบแทนสวัสดิการช่างรายบุคคล (Individual Technician Earnings - ทั้งหมด {calcData.individualStats.length} คน)
+                  </td>
                 </tr>
-                <tr className="text-gray-900 font-bold border-b border-gray-400 table-column-header bg-transparent">
-                  <th className="border border-gray-300 py-1.5 px-2 text-center w-10 bg-transparent">ลำดับ</th>
-                  <th className="border border-gray-300 py-1.5 px-2 text-left bg-transparent">ชื่อ-สกุล ช่างปฏิบัติงาน</th>
-                  <th className="border border-gray-300 py-1.5 px-2 text-left w-36 bg-transparent">สังกัดทีม</th>
-                  <th className="border border-gray-300 py-1.5 px-2 text-center w-28 bg-transparent">วันทำงานจริง</th>
-                  <th className="border border-gray-300 py-1.5 px-2 text-right w-36 bg-transparent">ยอดรับสุทธิ (บาท)</th>
-                  <th className="border border-gray-300 py-1.5 px-2 text-right w-24 bg-transparent">สัดส่วน (%)</th>
-                </tr>
-              </thead>
-              <tbody className="bg-transparent">
                 {calcData.individualStats.map((tech, idx) => {
                   const percentage = calcData.totalIncentive > 0
                     ? ((tech.incentive / calcData.totalIncentive) * 100).toFixed(1)
@@ -380,66 +319,54 @@ export const Reports: React.FC<ReportsProps> = ({
                     <tr key={tech.id} className="bg-transparent">
                       <td className="border border-gray-300 py-1.5 px-2 text-center text-gray-600 font-medium bg-transparent">{idx + 1}</td>
                       <td className="border border-gray-300 py-1.5 px-2 font-bold text-gray-900 bg-transparent">{tech.name}</td>
-                      <td className="border border-gray-300 py-1.5 px-2 text-gray-700 font-medium bg-transparent">{tech.teamName}</td>
+                      <td className="border border-gray-300 py-1.5 px-2 text-center text-gray-700 font-medium bg-transparent">{tech.teamName}</td>
                       <td className="border border-gray-300 py-1.5 px-2 text-center font-semibold text-gray-800 bg-transparent">{tech.workDays || 0} วัน</td>
+                      <td className="border border-gray-300 py-1.5 px-2 text-center text-gray-500 bg-transparent">-</td>
                       <td className="border border-gray-300 py-1.5 px-2 text-right font-black text-emerald-800 bg-transparent">฿{Math.round(tech.incentive || 0).toLocaleString()}</td>
                       <td className="border border-gray-300 py-1.5 px-2 text-right font-semibold text-gray-700 bg-transparent">{percentage}%</td>
                     </tr>
                   );
                 })}
-              </tbody>
-              <tfoot className="bg-transparent">
-                <tr className="font-bold border-t border-b-2 border-gray-400 bg-transparent">
+                <tr className="font-bold border-t-2 border-b-2 border-gray-400 bg-transparent">
                   <td colSpan={2} className="border border-gray-300 py-1.5 px-2 text-right font-black text-gray-900 bg-transparent">รวมจ่ายค่าสวัสดิการช่างรายบุคคล:</td>
-                  <td className="border border-gray-300 py-1.5 px-2 text-gray-700 bg-transparent">{calcData.individualStats.length} คน</td>
+                  <td className="border border-gray-300 py-1.5 px-2 text-center text-gray-700 font-bold bg-transparent">{calcData.individualStats.length} คน</td>
                   <td className="border border-gray-300 py-1.5 px-2 text-center font-black text-blue-900 bg-transparent">
                     {calcData.individualStats.reduce((s, t) => s + (t.workDays || 0), 0)} วัน-คน
                   </td>
+                  <td className="border border-gray-300 py-1.5 px-2 text-center text-gray-500 bg-transparent">-</td>
                   <td className="border border-gray-300 py-1.5 px-2 text-right font-black text-emerald-800 text-sm bg-transparent">
                     ฿{Math.round(calcData.individualStats.reduce((s, t) => s + (t.incentive || 0), 0)).toLocaleString()}
                   </td>
                   <td className="border border-gray-300 py-1.5 px-2 text-right font-black text-gray-900 bg-transparent">100%</td>
                 </tr>
-              </tfoot>
+              </tbody>
             </table>
 
-            {/* Official 4-Box Signature Block - 1/3 reduced gap */}
-            <div className="mt-5 pt-3 border-t border-gray-300 text-xs text-gray-800 print-signature-block">
-              <div className="font-bold text-center mb-2.5 text-gray-900 text-xs tracking-wider uppercase">
+            {/* Official 4-Box Signature Block - matching screenshot 172929 spacing, no top border */}
+            <div className="mt-8 text-xs text-gray-800 print-signature-block">
+              <div className="font-bold text-center mb-9 text-gray-900 text-xs tracking-wider uppercase">
                 ช่องทางลงนามและอนุมัติ (OFFICIAL SIGN-OFF & APPROVAL)
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                <div className="flex flex-col justify-between min-h-[90px]">
-                  <div className="h-11 md:h-12 w-full"></div>
-                  <div>
-                    <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
-                    <p className="text-[11px] text-gray-700 font-semibold mt-1">ผู้จัดทำรายงาน / Prepared By</p>
-                    <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
-                  </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center max-w-4xl mx-auto">
+                <div>
+                  <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                  <p className="text-[11px] text-gray-700 font-semibold mt-1.5">ผู้จัดทำรายงาน / Prepared By</p>
+                  <p className="text-[10px] text-gray-500 mt-1">วันที่ ........ / ........ / .............</p>
                 </div>
-                <div className="flex flex-col justify-between min-h-[90px]">
-                  <div className="h-11 md:h-12 w-full"></div>
-                  <div>
-                    <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
-                    <p className="text-[11px] text-gray-700 font-semibold mt-1">พนักงานตรวจสอบ / Checked By</p>
-                    <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
-                  </div>
+                <div>
+                  <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                  <p className="text-[11px] text-gray-700 font-semibold mt-1.5">พนักงานตรวจสอบ / Checked By</p>
+                  <p className="text-[10px] text-gray-500 mt-1">วันที่ ........ / ........ / .............</p>
                 </div>
-                <div className="flex flex-col justify-between min-h-[90px]">
-                  <div className="h-11 md:h-12 w-full"></div>
-                  <div>
-                    <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
-                    <p className="text-[11px] text-gray-700 font-semibold mt-1">ผู้จัดการแผนก / Dept Manager</p>
-                    <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
-                  </div>
+                <div>
+                  <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                  <p className="text-[11px] text-gray-700 font-semibold mt-1.5">ผู้จัดการแผนก / Dept Manager</p>
+                  <p className="text-[10px] text-gray-500 mt-1">วันที่ ........ / ........ / .............</p>
                 </div>
-                <div className="flex flex-col justify-between min-h-[90px]">
-                  <div className="h-11 md:h-12 w-full"></div>
-                  <div>
-                    <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
-                    <p className="text-[11px] text-gray-700 font-semibold mt-1">ผู้อนุมัติจ่าย / Authorized Signatory</p>
-                    <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
-                  </div>
+                <div>
+                  <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                  <p className="text-[11px] text-gray-700 font-semibold mt-1.5">ผู้อนุมัติจ่าย / Authorized Signatory</p>
+                  <p className="text-[10px] text-gray-500 mt-1">วันที่ ........ / ........ / .............</p>
                 </div>
               </div>
             </div>
@@ -455,40 +382,28 @@ export const Reports: React.FC<ReportsProps> = ({
                   <table className="report-table w-full text-left text-xs border-collapse border border-gray-300 bg-transparent">
                     <thead>
                       <tr className="print-header-row">
-                        <th colSpan={10} className="border-none p-0 pb-2 font-normal text-left bg-transparent">
-                          <div className="border-b-2 border-gray-900 pb-2 mb-2">
-                            <table className="w-full border-none border-collapse text-left m-0 p-0 bg-transparent">
-                              <tbody>
-                                <tr>
-                                  <td className="border-none p-0 align-top bg-transparent">
-                                    <table className="border-none border-collapse bg-transparent">
-                                      <tbody>
-                                        <tr>
-                                          <td className="border-none p-0 pr-3 align-middle w-12 bg-transparent">
-                                            <img src={LOGO_URL} alt="PASAYA" className="h-[46px] w-auto object-contain block" />
-                                          </td>
-                                          <td className="border-none p-0 align-middle bg-transparent">
-                                            <h2 className="font-extrabold text-xs md:text-sm text-gray-900 tracking-tight leading-tight">
-                                              บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
-                                            </h2>
-                                            <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
-                                              77/191-192 อาคารสินสาธรทาวเวอร์ ชั้น 42 ถนนกรุงธนบุรี แขวงคลองต้นไทร เขตคลองสาน กรุงเทพฯ 10600 (สํานักงานใหญ่)
-                                            </p>
-                                            <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
-                                              เลขประจําตัวผู้เสียภาษี 0105546015615 โทร: 0-2440-0955 แฟ็กซ์: 0-2440-0933-4
-                                            </p>
-                                          </td>
-                                        </tr>
-                                      </tbody>
-                                    </table>
-                                  </td>
-                                  <td className="border-none p-0 align-top text-right text-[11px] leading-tight whitespace-nowrap bg-transparent">
-                                    <div><strong className="text-gray-900">เลขที่เอกสาร:</strong> INC-TM-{(period?.id || '2026').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}-{selectedTeamId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}</div>
-                                    <div><strong className="text-gray-900">วันที่ออกเอกสาร:</strong> {issueDateStr}</div>
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
+                        <th colSpan={10} className="print-header-cell border-none p-0 pb-2 font-normal text-left bg-transparent">
+                          <div className="pb-2 mb-2">
+                            <div className="flex justify-between items-start gap-4">
+                              <div className="flex items-start gap-3">
+                                <img src={LOGO_URL} alt="PASAYA" className="h-[44px] w-auto object-contain block flex-shrink-0" />
+                                <div className="text-gray-900 leading-tight space-y-0.5">
+                                  <h2 className="font-extrabold text-xs md:text-sm text-gray-900 tracking-tight leading-tight">
+                                    บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
+                                  </h2>
+                                  <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
+                                    77/191-192 อาคารสินสาธรทาวเวอร์ ชั้น 42 ถนนกรุงธนบุรี แขวงคลองต้นไทร เขตคลองสาน กรุงเทพฯ 10600 (สํานักงานใหญ่)
+                                  </p>
+                                  <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
+                                    เลขประจําตัวผู้เสียภาษี 0105546015615 โทร: 0-2440-0955 แฟ็กซ์: 0-2440-0933-4
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right text-[11px] leading-tight whitespace-nowrap text-gray-800 flex-shrink-0">
+                                <div><strong className="text-gray-900">เลขที่เอกสาร:</strong> INC-TM-{(period?.id || '2026').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}-{selectedTeamId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}</div>
+                                <div><strong className="text-gray-900">วันที่ออกเอกสาร:</strong> {issueDateStr}</div>
+                              </div>
+                            </div>
 
                             <div className="text-center mt-2 space-y-0.5">
                               <h1 className="font-black text-base text-gray-900 tracking-tight leading-tight">
@@ -498,36 +413,32 @@ export const Reports: React.FC<ReportsProps> = ({
                                 ประจำรอบการคำนวณ: <span className="text-gray-900 font-bold">{period?.name || ''}</span> ({formatDateTH(period?.start || '')} ถึง {formatDateTH(period?.end || '')})
                               </p>
                             </div>
-                          </div>
 
-                          {/* Team Info Metrics Header - Clean borderless table */}
-                          <table className="w-full border-none border-collapse text-xs mb-2 text-left bg-transparent">
-                            <tbody>
-                              <tr>
-                                <td className="border-none p-1 text-left bg-transparent">
-                                  <span className="text-gray-600 block text-[11px]">ทีมช่างปฏิบัติงาน:</span>
-                                  <strong className="text-xs md:text-sm text-gray-900 font-bold">{calcData.reportTeamLogs[selectedTeamId]?.name || ''}</strong>
-                                </td>
-                                <td className="border-none p-1 text-center bg-transparent">
-                                  <span className="text-gray-600 block text-[11px]">จำนวนรายการงานทั้งหมด:</span>
-                                  <strong className="text-xs md:text-sm text-gray-900 font-bold">
-                                    {calcData.reportTeamLogs[selectedTeamId].rows.filter(r => !r.isHoliday).length} รายการ
-                                  </strong>
-                                </td>
-                                <td className="border-none p-1 text-right bg-transparent">
-                                  <span className="text-gray-600 block text-[11px]">ยอดรวม Incentive ทีมสุทธิ:</span>
-                                  <strong className="text-sm md:text-base text-emerald-800 font-black">
-                                    ฿{Math.round(
-                                      calcData.reportTeamLogs[selectedTeamId].rows.reduce(
-                                        (sum, r) => sum + (typeof r.inc === 'number' ? r.inc : 0),
-                                        0
-                                      )
-                                    ).toLocaleString()}
-                                  </strong>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
+                            {/* Team Info Metrics Line - Clean borderless flex */}
+                            <div className="flex justify-between items-center text-xs mt-2 pt-1.5 px-1 text-gray-800 font-medium">
+                              <div>
+                                <span className="text-gray-500 text-[10px] block">ทีมช่างปฏิบัติงาน:</span>
+                                <strong className="text-xs md:text-sm text-gray-900 font-bold">{calcData.reportTeamLogs[selectedTeamId]?.name || ''}</strong>
+                              </div>
+                              <div className="text-center">
+                                <span className="text-gray-500 text-[10px] block">จำนวนรายการงานทั้งหมด:</span>
+                                <strong className="text-xs md:text-sm text-gray-900 font-bold">
+                                  {calcData.reportTeamLogs[selectedTeamId].rows.filter(r => !r.isHoliday).length} รายการ
+                                </strong>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-gray-500 text-[10px] block">ยอดรวม Incentive ทีมสุทธิ:</span>
+                                <strong className="text-sm md:text-base text-emerald-800 font-black">
+                                  ฿{Math.round(
+                                    calcData.reportTeamLogs[selectedTeamId].rows.reduce(
+                                      (sum, r) => sum + (typeof r.inc === 'number' ? r.inc : 0),
+                                      0
+                                    )
+                                  ).toLocaleString()}
+                                </strong>
+                              </div>
+                            </div>
+                          </div>
                         </th>
                       </tr>
 
@@ -615,27 +526,21 @@ export const Reports: React.FC<ReportsProps> = ({
                   </table>
                 </div>
 
-                {/* Official Sign-off Approval Block - 1/3 reduced gap */}
-                <div className="mt-5 pt-3 border-t border-gray-300 text-xs text-gray-800 print-signature-block">
-                  <div className="font-bold text-center mb-2.5 text-gray-900 text-xs tracking-wider uppercase">
+                {/* Official Sign-off Approval Block - matching screenshot 172929 spacing, no top border */}
+                <div className="mt-8 text-xs text-gray-800 print-signature-block">
+                  <div className="font-bold text-center mb-9 text-gray-900 text-xs tracking-wider uppercase">
                     ช่องทางลงนามและอนุมัติ (OFFICIAL SIGN-OFF & APPROVAL)
                   </div>
-                  <div className="grid grid-cols-2 gap-8 text-center max-w-2xl mx-auto">
-                    <div className="flex flex-col justify-between min-h-[90px]">
-                      <div className="h-11 md:h-12 w-full"></div>
-                      <div>
-                        <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
-                        <p className="text-[11px] text-gray-700 font-semibold mt-1">หัวหน้าทีมช่าง / Team Lead Signature</p>
-                        <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
-                      </div>
+                  <div className="grid grid-cols-2 gap-12 text-center max-w-xl mx-auto">
+                    <div>
+                      <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                      <p className="text-[11px] text-gray-700 font-semibold mt-1.5">หัวหน้าทีมช่าง / Team Lead Signature</p>
+                      <p className="text-[10px] text-gray-500 mt-1">วันที่ ........ / ........ / .............</p>
                     </div>
-                    <div className="flex flex-col justify-between min-h-[90px]">
-                      <div className="h-11 md:h-12 w-full"></div>
-                      <div>
-                        <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
-                        <p className="text-[11px] text-gray-700 font-semibold mt-1">ผู้อนุมัติการจ่ายสวัสดิการ / Authorized Signatory</p>
-                        <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
-                      </div>
+                    <div>
+                      <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                      <p className="text-[11px] text-gray-700 font-semibold mt-1.5">ผู้อนุมัติการจ่ายสวัสดิการ / Authorized Signatory</p>
+                      <p className="text-[10px] text-gray-500 mt-1">วันที่ ........ / ........ / .............</p>
                     </div>
                   </div>
                 </div>
@@ -657,40 +562,28 @@ export const Reports: React.FC<ReportsProps> = ({
                   <table className="report-table w-full text-left text-xs border-collapse border border-gray-300 bg-transparent">
                     <thead>
                       <tr className="print-header-row">
-                        <th colSpan={10} className="border-none p-0 pb-2 font-normal text-left bg-transparent">
-                          <div className="border-b-2 border-gray-900 pb-2 mb-2">
-                            <table className="w-full border-none border-collapse text-left m-0 p-0 bg-transparent">
-                              <tbody>
-                                <tr>
-                                  <td className="border-none p-0 align-top bg-transparent">
-                                    <table className="border-none border-collapse bg-transparent">
-                                      <tbody>
-                                        <tr>
-                                          <td className="border-none p-0 pr-3 align-middle w-12 bg-transparent">
-                                            <img src={LOGO_URL} alt="PASAYA" className="h-[46px] w-auto object-contain block" />
-                                          </td>
-                                          <td className="border-none p-0 align-middle bg-transparent">
-                                            <h2 className="font-extrabold text-xs md:text-sm text-gray-900 tracking-tight leading-tight">
-                                              บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
-                                            </h2>
-                                            <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
-                                              77/191-192 อาคารสินสาธรทาวเวอร์ ชั้น 42 ถนนกรุงธนบุรี แขวงคลองต้นไทร เขตคลองสาน กรุงเทพฯ 10600 (สํานักงานใหญ่)
-                                            </p>
-                                            <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
-                                              เลขประจําตัวผู้เสียภาษี 0105546015615 โทร: 0-2440-0955 แฟ็กซ์: 0-2440-0933-4
-                                            </p>
-                                          </td>
-                                        </tr>
-                                      </tbody>
-                                    </table>
-                                  </td>
-                                  <td className="border-none p-0 align-top text-right text-[11px] leading-tight whitespace-nowrap bg-transparent">
-                                    <div><strong className="text-gray-900">เลขที่เอกสาร:</strong> SLIP-{(period?.id || '2026').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}-{selectedTechId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}</div>
-                                    <div><strong className="text-gray-900">วันที่ออกเอกสาร:</strong> {issueDateStr}</div>
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
+                        <th colSpan={10} className="print-header-cell border-none p-0 pb-2 font-normal text-left bg-transparent">
+                          <div className="pb-2 mb-2">
+                            <div className="flex justify-between items-start gap-4">
+                              <div className="flex items-start gap-3">
+                                <img src={LOGO_URL} alt="PASAYA" className="h-[44px] w-auto object-contain block flex-shrink-0" />
+                                <div className="text-gray-900 leading-tight space-y-0.5">
+                                  <h2 className="font-extrabold text-xs md:text-sm text-gray-900 tracking-tight leading-tight">
+                                    บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
+                                  </h2>
+                                  <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
+                                    77/191-192 อาคารสินสาธรทาวเวอร์ ชั้น 42 ถนนกรุงธนบุรี แขวงคลองต้นไทร เขตคลองสาน กรุงเทพฯ 10600 (สํานักงานใหญ่)
+                                  </p>
+                                  <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
+                                    เลขประจําตัวผู้เสียภาษี 0105546015615 โทร: 0-2440-0955 แฟ็กซ์: 0-2440-0933-4
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right text-[11px] leading-tight whitespace-nowrap text-gray-800 flex-shrink-0">
+                                <div><strong className="text-gray-900">เลขที่เอกสาร:</strong> SLIP-{(period?.id || '2026').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}-{selectedTechId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}</div>
+                                <div><strong className="text-gray-900">วันที่ออกเอกสาร:</strong> {issueDateStr}</div>
+                              </div>
+                            </div>
 
                             <div className="text-center mt-2 space-y-0.5">
                               <h1 className="font-black text-base text-gray-900 tracking-tight leading-tight">
@@ -700,41 +593,37 @@ export const Reports: React.FC<ReportsProps> = ({
                                 ประจำรอบการคำนวณ: <span className="text-gray-900 font-bold">{period?.name || ''}</span> ({formatDateTH(period?.start || '')} ถึง {formatDateTH(period?.end || '')})
                               </p>
                             </div>
-                          </div>
 
-                          {/* Tech Info Metrics Header - Clean borderless table */}
-                          <table className="w-full border-none border-collapse text-xs mb-2 text-left bg-transparent">
-                            <tbody>
-                              <tr>
-                                <td className="border-none p-1 text-left bg-transparent">
-                                  <span className="text-gray-600 block text-[11px]">ชื่อพนักงานช่าง:</span>
-                                  <strong className="text-xs md:text-sm text-gray-900 font-bold">
-                                    {calcData.reportTechLogs[selectedTechId]?.name || ''}
-                                  </strong>
-                                  <span className="text-gray-500 text-[10px] block">
-                                    (สังกัดทีม: {calcData.reportTechLogs[selectedTechId]?.teamName || ''})
-                                  </span>
-                                </td>
-                                <td className="border-none p-1 text-center bg-transparent">
-                                  <span className="text-gray-600 block text-[11px]">วันเข้าปฏิบัติงานจริง:</span>
-                                  <strong className="text-xs md:text-sm text-gray-900 font-bold">
-                                    {calcData.individualStats.find(s => s.id === selectedTechId)?.workDays || 0} วัน
-                                  </strong>
-                                </td>
-                                <td className="border-none p-1 text-right bg-transparent">
-                                  <span className="text-gray-600 block text-[11px]">ยอดรับเงินสุทธิส่วนบุคคล:</span>
-                                  <strong className="text-sm md:text-base text-emerald-800 font-black">
-                                    ฿{Math.round(
-                                      calcData.reportTechLogs[selectedTechId].rows.reduce(
-                                        (sum, r) => sum + (typeof r.inc === 'number' ? r.inc : 0),
-                                        0
-                                      )
-                                    ).toLocaleString()}
-                                  </strong>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
+                            {/* Tech Info Metrics Line - Clean borderless flex */}
+                            <div className="flex justify-between items-center text-xs mt-2 pt-1.5 px-1 text-gray-800 font-medium">
+                              <div>
+                                <span className="text-gray-500 text-[10px] block">ชื่อพนักงานช่าง:</span>
+                                <strong className="text-xs md:text-sm text-gray-900 font-bold">
+                                  {calcData.reportTechLogs[selectedTechId]?.name || ''}
+                                </strong>
+                                <span className="text-gray-500 text-[10px] block">
+                                  (สังกัดทีม: {calcData.reportTechLogs[selectedTechId]?.teamName || ''})
+                                </span>
+                              </div>
+                              <div className="text-center">
+                                <span className="text-gray-500 text-[10px] block">วันเข้าปฏิบัติงานจริง:</span>
+                                <strong className="text-xs md:text-sm text-gray-900 font-bold">
+                                  {calcData.individualStats.find(s => s.id === selectedTechId)?.workDays || 0} วัน
+                                </strong>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-gray-500 text-[10px] block">ยอดรับเงินสุทธิส่วนบุคคล:</span>
+                                <strong className="text-sm md:text-base text-emerald-800 font-black">
+                                  ฿{Math.round(
+                                    calcData.reportTechLogs[selectedTechId].rows.reduce(
+                                      (sum, r) => sum + (typeof r.inc === 'number' ? r.inc : 0),
+                                      0
+                                    )
+                                  ).toLocaleString()}
+                                </strong>
+                              </div>
+                            </div>
+                          </div>
                         </th>
                       </tr>
 
@@ -828,27 +717,21 @@ export const Reports: React.FC<ReportsProps> = ({
                   </table>
                 </div>
 
-                {/* Official Sign-off Approval Block - 1/3 reduced gap */}
-                <div className="mt-5 pt-3 border-t border-gray-300 text-xs text-gray-800 print-signature-block">
-                  <div className="font-bold text-center mb-2.5 text-gray-900 text-xs tracking-wider uppercase">
+                {/* Official Sign-off Approval Block - matching screenshot 172929 spacing, no top border */}
+                <div className="mt-8 text-xs text-gray-800 print-signature-block">
+                  <div className="font-bold text-center mb-9 text-gray-900 text-xs tracking-wider uppercase">
                     ช่องทางลงนามและอนุมัติ (OFFICIAL SIGN-OFF & APPROVAL)
                   </div>
-                  <div className="grid grid-cols-2 gap-8 text-center max-w-2xl mx-auto">
-                    <div className="flex flex-col justify-between min-h-[90px]">
-                      <div className="h-11 md:h-12 w-full"></div>
-                      <div>
-                        <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
-                        <p className="text-[11px] text-gray-700 font-semibold mt-1">ลายมือชื่อพนักงานผู้รับเงิน / Employee Signature</p>
-                        <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
-                      </div>
+                  <div className="grid grid-cols-2 gap-12 text-center max-w-xl mx-auto">
+                    <div>
+                      <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                      <p className="text-[11px] text-gray-700 font-semibold mt-1.5">ลายมือชื่อพนักงานผู้รับเงิน / Employee Signature</p>
+                      <p className="text-[10px] text-gray-500 mt-1">วันที่ ........ / ........ / .............</p>
                     </div>
-                    <div className="flex flex-col justify-between min-h-[90px]">
-                      <div className="h-11 md:h-12 w-full"></div>
-                      <div>
-                        <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
-                        <p className="text-[11px] text-gray-700 font-semibold mt-1">ผู้อนุมัติการจ่ายสวัสดิการ / Authorized Signatory</p>
-                        <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
-                      </div>
+                    <div>
+                      <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                      <p className="text-[11px] text-gray-700 font-semibold mt-1.5">ผู้อนุมัติการจ่ายสวัสดิการ / Authorized Signatory</p>
+                      <p className="text-[10px] text-gray-500 mt-1">วันที่ ........ / ........ / .............</p>
                     </div>
                   </div>
                 </div>
@@ -868,40 +751,28 @@ export const Reports: React.FC<ReportsProps> = ({
               <table className="report-table w-full text-left text-xs border-collapse border border-gray-300 bg-transparent">
                 <thead>
                   <tr className="print-header-row">
-                    <th colSpan={6} className="border-none p-0 pb-2 font-normal text-left bg-transparent">
-                      <div className="border-b-2 border-gray-900 pb-2 mb-2">
-                        <table className="w-full border-none border-collapse text-left m-0 p-0 bg-transparent">
-                          <tbody>
-                            <tr>
-                              <td className="border-none p-0 align-top bg-transparent">
-                                <table className="border-none border-collapse bg-transparent">
-                                  <tbody>
-                                    <tr>
-                                      <td className="border-none p-0 pr-3 align-middle w-12 bg-transparent">
-                                        <img src={LOGO_URL} alt="PASAYA" className="h-[46px] w-auto object-contain block" />
-                                      </td>
-                                      <td className="border-none p-0 align-middle bg-transparent">
-                                        <h2 className="font-extrabold text-xs md:text-sm text-gray-900 tracking-tight leading-tight">
-                                          บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
-                                        </h2>
-                                        <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
-                                          77/191-192 อาคารสินสาธรทาวเวอร์ ชั้น 42 ถนนกรุงธนบุรี แขวงคลองต้นไทร เขตคลองสาน กรุงเทพฯ 10600 (สํานักงานใหญ่)
-                                        </p>
-                                        <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
-                                          รายงานวิเคราะห์สัดส่วนผลงานและค่าตอบแทน แยกตามประเภทงาน
-                                        </p>
-                                      </td>
-                                    </tr>
-                                  </tbody>
-                                </table>
-                              </td>
-                              <td className="border-none p-0 align-top text-right text-[11px] leading-tight whitespace-nowrap bg-transparent">
-                                <div><strong className="text-gray-900">หมวดรายงาน:</strong> {jobTypeViewSubtab === 'overall' ? 'ภาพรวมทั้งบริษัท' : jobTypeViewSubtab === 'by_team' ? 'สรุปแยกตามทีม' : 'สรุปแยกตามรายคน'}</div>
-                                <div><strong className="text-gray-900">วันที่ออกเอกสาร:</strong> {issueDateStr}</div>
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
+                    <th colSpan={6} className="print-header-cell border-none p-0 pb-2 font-normal text-left bg-transparent">
+                      <div className="pb-2 mb-2">
+                        <div className="flex justify-between items-start gap-4">
+                          <div className="flex items-start gap-3">
+                            <img src={LOGO_URL} alt="PASAYA" className="h-[44px] w-auto object-contain block flex-shrink-0" />
+                            <div className="text-gray-900 leading-tight space-y-0.5">
+                              <h2 className="font-extrabold text-xs md:text-sm text-gray-900 tracking-tight leading-tight">
+                                บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
+                              </h2>
+                              <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
+                                77/191-192 อาคารสินสาธรทาวเวอร์ ชั้น 42 ถนนกรุงธนบุรี แขวงคลองต้นไทร เขตคลองสาน กรุงเทพฯ 10600 (สํานักงานใหญ่)
+                              </p>
+                              <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
+                                รายงานวิเคราะห์สัดส่วนผลงานและค่าตอบแทน แยกตามประเภทงาน
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right text-[11px] leading-tight whitespace-nowrap text-gray-800 flex-shrink-0">
+                            <div><strong className="text-gray-900">หมวดรายงาน:</strong> {jobTypeViewSubtab === 'overall' ? 'ภาพรวมทั้งบริษัท' : jobTypeViewSubtab === 'by_team' ? 'สรุปแยกตามทีม' : 'สรุปแยกตามรายคน'}</div>
+                            <div><strong className="text-gray-900">วันที่ออกเอกสาร:</strong> {issueDateStr}</div>
+                          </div>
+                        </div>
 
                         <div className="text-center mt-2 space-y-0.5">
                           <h1 className="font-black text-base text-gray-900 tracking-tight leading-tight">
@@ -1096,27 +967,21 @@ export const Reports: React.FC<ReportsProps> = ({
               </table>
             </div>
 
-            {/* Official Sign-off Approval Block - 1/3 reduced gap */}
-            <div className="mt-5 pt-3 border-t border-gray-300 text-xs text-gray-800 print-signature-block">
-              <div className="font-bold text-center mb-2.5 text-gray-900 text-xs tracking-wider uppercase">
+            {/* Official Sign-off Approval Block - matching screenshot 172929 spacing, no top border */}
+            <div className="mt-8 text-xs text-gray-800 print-signature-block">
+              <div className="font-bold text-center mb-9 text-gray-900 text-xs tracking-wider uppercase">
                 ช่องทางลงนามและอนุมัติ (OFFICIAL SIGN-OFF & APPROVAL)
               </div>
-              <div className="grid grid-cols-2 gap-8 text-center max-w-2xl mx-auto">
-                <div className="flex flex-col justify-between min-h-[90px]">
-                  <div className="h-11 md:h-12 w-full"></div>
-                  <div>
-                    <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
-                    <p className="text-[11px] text-gray-700 font-semibold mt-1">ผู้จัดทำรายงาน / Prepared By</p>
-                    <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
-                  </div>
+              <div className="grid grid-cols-2 gap-12 text-center max-w-xl mx-auto">
+                <div>
+                  <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                  <p className="text-[11px] text-gray-700 font-semibold mt-1.5">ผู้จัดทำรายงาน / Prepared By</p>
+                  <p className="text-[10px] text-gray-500 mt-1">วันที่ ........ / ........ / .............</p>
                 </div>
-                <div className="flex flex-col justify-between min-h-[90px]">
-                  <div className="h-11 md:h-12 w-full"></div>
-                  <div>
-                    <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
-                    <p className="text-[11px] text-gray-700 font-semibold mt-1">ผู้อนุมัติการจ่ายสวัสดิการ / Authorized Signatory</p>
-                    <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
-                  </div>
+                <div>
+                  <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                  <p className="text-[11px] text-gray-700 font-semibold mt-1.5">ผู้อนุมัติการจ่ายสวัสดิการ / Authorized Signatory</p>
+                  <p className="text-[10px] text-gray-500 mt-1">วันที่ ........ / ........ / .............</p>
                 </div>
               </div>
             </div>
