@@ -159,14 +159,14 @@ export const Reports: React.FC<ReportsProps> = ({
       </div>
 
       {/* Official Printed Document Area */}
-      <div className="p-4 md:p-6 bg-white">
+      <div className="p-4 md:p-6 bg-white print:p-0 print:m-0 print-clean-container">
         {/* 0. Overview Report View */}
         {reportType === 'overview' && (
           <div className="report-scroll-container">
             <table className="report-table w-full text-left text-xs border-collapse border border-gray-300">
               <thead>
                 <tr className="print-header-row">
-                  <td colSpan={7} className="border-none p-0 pb-2">
+                  <th colSpan={7} className="border-none p-0 pb-2 font-normal text-left bg-transparent">
                     <div className="border-b-2 border-gray-900 pb-2 mb-2">
                       <div className="flex flex-wrap justify-between items-start gap-2">
                         <div className="flex items-start gap-3">
@@ -240,7 +240,7 @@ export const Reports: React.FC<ReportsProps> = ({
                         </strong>
                       </div>
                     </div>
-                  </td>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -381,29 +381,38 @@ export const Reports: React.FC<ReportsProps> = ({
                 ช่องทางลงนามและอนุมัติ (OFFICIAL SIGN-OFF & APPROVAL)
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                <div className="p-2 border border-gray-200 rounded bg-white">
-                  <div className="border-b border-dashed border-gray-400 w-4/5 mx-auto mb-2 mt-4"></div>
-                  <p className="font-bold text-gray-900">(........................................................)</p>
-                  <p className="text-[11px] text-gray-600 font-medium mt-1">ผู้จัดทำรายงาน / Prepared By</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                <div className="flex flex-col justify-between min-h-[140px]">
+                  {/* Generous empty space for actual physical pen signature */}
+                  <div className="h-16 md:h-20 w-full"></div>
+                  <div>
+                    <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                    <p className="text-[11px] text-gray-700 font-semibold mt-1">ผู้จัดทำรายงาน / Prepared By</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                  </div>
                 </div>
-                <div className="p-2 border border-gray-200 rounded bg-white">
-                  <div className="border-b border-dashed border-gray-400 w-4/5 mx-auto mb-2 mt-4"></div>
-                  <p className="font-bold text-gray-900">(........................................................)</p>
-                  <p className="text-[11px] text-gray-600 font-medium mt-1">พนักงานตรวจสอบ / Checked By</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                <div className="flex flex-col justify-between min-h-[140px]">
+                  <div className="h-16 md:h-20 w-full"></div>
+                  <div>
+                    <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                    <p className="text-[11px] text-gray-700 font-semibold mt-1">พนักงานตรวจสอบ / Checked By</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                  </div>
                 </div>
-                <div className="p-2 border border-gray-200 rounded bg-white">
-                  <div className="border-b border-dashed border-gray-400 w-4/5 mx-auto mb-2 mt-4"></div>
-                  <p className="font-bold text-gray-900">(........................................................)</p>
-                  <p className="text-[11px] text-gray-600 font-medium mt-1">ผู้จัดการแผนก / Dept Manager</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                <div className="flex flex-col justify-between min-h-[140px]">
+                  <div className="h-16 md:h-20 w-full"></div>
+                  <div>
+                    <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                    <p className="text-[11px] text-gray-700 font-semibold mt-1">ผู้จัดการแผนก / Dept Manager</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                  </div>
                 </div>
-                <div className="p-2 border border-gray-200 rounded bg-white">
-                  <div className="border-b border-dashed border-gray-400 w-4/5 mx-auto mb-2 mt-4"></div>
-                  <p className="font-bold text-gray-900">(........................................................)</p>
-                  <p className="text-[11px] text-gray-600 font-medium mt-1">ผู้อนุมัติจ่าย / Authorized Signatory</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                <div className="flex flex-col justify-between min-h-[140px]">
+                  <div className="h-16 md:h-20 w-full"></div>
+                  <div>
+                    <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                    <p className="text-[11px] text-gray-700 font-semibold mt-1">ผู้อนุมัติจ่าย / Authorized Signatory</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -419,7 +428,7 @@ export const Reports: React.FC<ReportsProps> = ({
                   <table className="report-table w-full text-left text-xs border-collapse border border-gray-300">
                     <thead>
                       <tr className="print-header-row">
-                        <td colSpan={10} className="border-none p-0 pb-2">
+                        <th colSpan={10} className="border-none p-0 pb-2 font-normal text-left bg-transparent">
                           <div className="border-b-2 border-gray-900 pb-2 mb-2">
                             <div className="flex flex-wrap justify-between items-start gap-2">
                               <div className="flex items-start gap-3">
@@ -478,7 +487,7 @@ export const Reports: React.FC<ReportsProps> = ({
                               </strong>
                             </div>
                           </div>
-                        </td>
+                        </th>
                       </tr>
 
                       {/* Column Headers */}
@@ -571,17 +580,23 @@ export const Reports: React.FC<ReportsProps> = ({
                     ช่องทางลงนามและอนุมัติ (OFFICIAL SIGN-OFF & APPROVAL)
                   </div>
                   <div className="grid grid-cols-2 gap-8 text-center max-w-2xl mx-auto">
-                    <div>
-                      <div className="border-b border-dashed border-gray-400 w-4/5 mx-auto mb-2"></div>
-                      <p className="font-bold text-gray-900">(........................................................)</p>
-                      <p className="text-[11px] text-gray-600 font-medium mt-1">หัวหน้าทีมช่าง / Team Lead Signature</p>
-                      <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                    <div className="flex flex-col justify-between min-h-[140px]">
+                      {/* Generous empty space for actual physical pen signature */}
+                      <div className="h-16 md:h-20 w-full"></div>
+                      <div>
+                        <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                        <p className="text-[11px] text-gray-700 font-semibold mt-1">หัวหน้าทีมช่าง / Team Lead Signature</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                      </div>
                     </div>
-                    <div>
-                      <div className="border-b border-dashed border-gray-400 w-4/5 mx-auto mb-2"></div>
-                      <p className="font-bold text-gray-900">(........................................................)</p>
-                      <p className="text-[11px] text-gray-600 font-medium mt-1">ผู้อนุมัติการจ่ายสวัสดิการ / Authorized Signatory</p>
-                      <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                    <div className="flex flex-col justify-between min-h-[140px]">
+                      {/* Generous empty space for actual physical pen signature */}
+                      <div className="h-16 md:h-20 w-full"></div>
+                      <div>
+                        <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                        <p className="text-[11px] text-gray-700 font-semibold mt-1">ผู้อนุมัติการจ่ายสวัสดิการ / Authorized Signatory</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -603,7 +618,7 @@ export const Reports: React.FC<ReportsProps> = ({
                   <table className="report-table w-full text-left text-xs border-collapse border border-gray-300">
                     <thead>
                       <tr className="print-header-row">
-                        <td colSpan={10} className="border-none p-0 pb-2">
+                        <th colSpan={10} className="border-none p-0 pb-2 font-normal text-left bg-transparent">
                           <div className="border-b-2 border-gray-900 pb-2 mb-2">
                             <div className="flex flex-wrap justify-between items-start gap-2">
                               <div className="flex items-start gap-3">
@@ -667,7 +682,7 @@ export const Reports: React.FC<ReportsProps> = ({
                               </strong>
                             </div>
                           </div>
-                        </td>
+                        </th>
                       </tr>
 
                       {/* Column Headers */}
@@ -766,17 +781,23 @@ export const Reports: React.FC<ReportsProps> = ({
                     ช่องทางลงนามและอนุมัติ (OFFICIAL SIGN-OFF & APPROVAL)
                   </div>
                   <div className="grid grid-cols-2 gap-8 text-center max-w-2xl mx-auto">
-                    <div>
-                      <div className="border-b border-dashed border-gray-400 w-4/5 mx-auto mb-2"></div>
-                      <p className="font-bold text-gray-900">(........................................................)</p>
-                      <p className="text-[11px] text-gray-600 font-medium mt-1">ลายมือชื่อพนักงานผู้รับเงิน / Employee Signature</p>
-                      <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                    <div className="flex flex-col justify-between min-h-[140px]">
+                      {/* Generous empty space for actual physical pen signature */}
+                      <div className="h-16 md:h-20 w-full"></div>
+                      <div>
+                        <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                        <p className="text-[11px] text-gray-700 font-semibold mt-1">ลายมือชื่อพนักงานผู้รับเงิน / Employee Signature</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                      </div>
                     </div>
-                    <div>
-                      <div className="border-b border-dashed border-gray-400 w-4/5 mx-auto mb-2"></div>
-                      <p className="font-bold text-gray-900">(........................................................)</p>
-                      <p className="text-[11px] text-gray-600 font-medium mt-1">ผู้อนุมัติการจ่ายสวัสดิการ / Authorized Signatory</p>
-                      <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                    <div className="flex flex-col justify-between min-h-[140px]">
+                      {/* Generous empty space for actual physical pen signature */}
+                      <div className="h-16 md:h-20 w-full"></div>
+                      <div>
+                        <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                        <p className="text-[11px] text-gray-700 font-semibold mt-1">ผู้อนุมัติการจ่ายสวัสดิการ / Authorized Signatory</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -796,7 +817,7 @@ export const Reports: React.FC<ReportsProps> = ({
               <table className="report-table w-full text-left text-xs border-collapse border border-gray-300">
                 <thead>
                   <tr className="print-header-row">
-                    <td colSpan={6} className="border-none p-0 pb-2">
+                    <th colSpan={6} className="border-none p-0 pb-2 font-normal text-left bg-transparent">
                       <div className="border-b-2 border-gray-900 pb-2 mb-2">
                         <div className="flex flex-wrap justify-between items-start gap-2">
                           <div className="flex items-start gap-3">
@@ -830,7 +851,7 @@ export const Reports: React.FC<ReportsProps> = ({
                           </p>
                         </div>
                       </div>
-                    </td>
+                    </th>
                   </tr>
 
                   {/* Dynamic Column Headers by Subtab */}
@@ -1020,17 +1041,23 @@ export const Reports: React.FC<ReportsProps> = ({
                 ช่องทางลงนามและอนุมัติ (OFFICIAL SIGN-OFF & APPROVAL)
               </div>
               <div className="grid grid-cols-2 gap-8 text-center max-w-2xl mx-auto">
-                <div>
-                  <div className="border-b border-dashed border-gray-400 w-4/5 mx-auto mb-2"></div>
-                  <p className="font-bold text-gray-900">(........................................................)</p>
-                  <p className="text-[11px] text-gray-600 font-medium mt-1">ผู้จัดทำรายงาน / Prepared By</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                <div className="flex flex-col justify-between min-h-[140px]">
+                  {/* Generous empty space for actual physical pen signature */}
+                  <div className="h-16 md:h-20 w-full"></div>
+                  <div>
+                    <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                    <p className="text-[11px] text-gray-700 font-semibold mt-1">ผู้จัดทำรายงาน / Prepared By</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                  </div>
                 </div>
-                <div>
-                  <div className="border-b border-dashed border-gray-400 w-4/5 mx-auto mb-2"></div>
-                  <p className="font-bold text-gray-900">(........................................................)</p>
-                  <p className="text-[11px] text-gray-600 font-medium mt-1">ผู้อนุมัติการจ่ายสวัสดิการ / Authorized Signatory</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                <div className="flex flex-col justify-between min-h-[140px]">
+                  {/* Generous empty space for actual physical pen signature */}
+                  <div className="h-16 md:h-20 w-full"></div>
+                  <div>
+                    <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                    <p className="text-[11px] text-gray-700 font-semibold mt-1">ผู้อนุมัติการจ่ายสวัสดิการ / Authorized Signatory</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                  </div>
                 </div>
               </div>
             </div>

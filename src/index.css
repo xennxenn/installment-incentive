@@ -59,24 +59,19 @@
       break-inside: auto !important;
     }
 
-    thead {
+    thead, .report-table thead {
       display: table-header-group !important;
-      break-inside: avoid !important;
-      page-break-inside: avoid !important;
-      page-break-after: avoid !important;
     }
 
-    tfoot {
+    tfoot, .report-table tfoot {
       display: table-footer-group !important;
-      break-inside: avoid !important;
-      page-break-inside: avoid !important;
     }
 
-    tbody {
+    tbody, .report-table tbody {
       display: table-row-group !important;
     }
 
-    tr {
+    tr, .report-table tr {
       break-inside: avoid !important;
       page-break-inside: avoid !important;
       page-break-after: auto !important;
@@ -91,9 +86,12 @@
       color: #0f172a !important;
     }
 
-    .print-header-row td {
+    .print-header-row td,
+    .print-header-row th {
       border: none !important;
       padding: 0 0 4px 0 !important;
+      background-color: transparent !important;
+      font-weight: normal !important;
     }
 
     .print-bordered-box {
@@ -106,9 +104,25 @@
       color: #0f172a !important;
     }
 
+    /* In print, disable sticky headers and remove scroll/overflow bounds */
+    .report-table thead tr.table-column-header th {
+      position: static !important;
+      top: auto !important;
+      box-shadow: none !important;
+    }
+
+    .report-scroll-container {
+      overflow: visible !important;
+      max-height: none !important;
+      height: auto !important;
+      display: block !important;
+      width: 100% !important;
+    }
+
     .print-signature-block {
       break-inside: avoid !important;
       page-break-inside: avoid !important;
+      margin-top: 1.5rem !important;
     }
   }
 
