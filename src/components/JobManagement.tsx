@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
   Search, Plus, FileSpreadsheet, ArrowUp, ArrowDown, CheckSquare, 
   Square, Trash2, X, AlertCircle, CheckCircle2, SlidersHorizontal, Calendar, Clock,
@@ -47,9 +47,19 @@ export const JobManagement: React.FC<JobManagementProps> = ({
   jobSortOrder,
   setJobSortOrder
 }) => {
-  const availableJobTypes = rules?.customJobTypes && rules.customJobTypes.length > 0
-    ? rules.customJobTypes
-    : JOB_TYPES;
+  const availableJobTypes = useMemo(() => {
+    const custom = rules?.customJobTypes || [];
+    const map = new Map<string, any>();
+    JOB_TYPES.forEach(t => map.set(t.id, t));
+    custom.forEach(t => {
+      if (map.has(t.id)) {
+        map.set(t.id, { ...map.get(t.id), ...t });
+      } else {
+        map.set(t.id, t);
+      }
+    });
+    return Array.from(map.values());
+  }, [rules?.customJobTypes]);
 
   const getJobTypeInfo = (typeId: string) => {
     return availableJobTypes.find(t => t.id === typeId) || JOB_TYPES.find(t => t.id === typeId);
@@ -106,6 +116,14 @@ export const JobManagement: React.FC<JobManagementProps> = ({
   };
 
   const toggleModalTech = (techId: string) => {
+    const leave = (leaves || []).find(l => l.techId === techId && l.date === newDate);
+    const isLeave = !!(leave && leave.type !== 'no_inc');
+    const member = (teams || []).flatMap(t => t.members || []).find(m => m.id === techId);
+    const isResigned = member?.resignDate && newDate >= member.resignDate;
+    const isNotYetJoined = member?.joinDate && newDate < member.joinDate;
+
+    if (isLeave || isResigned || isNotYetJoined) return;
+
     setNewSelectedTechs(prev =>
       prev.includes(techId) ? prev.filter(id => id !== techId) : [...prev, techId]
     );
@@ -167,9 +185,10 @@ export const JobManagement: React.FC<JobManagementProps> = ({
     if (!typeStr) return 'install';
     const s = typeStr.trim();
 
+    if (s.includes('แก้ไข') && (s.includes('บันไดสูง') || s.includes('บันได'))) return 'fix_high';
+    if (s.includes('แก้ไข') && s.includes('นั่งร้าน')) return 'fix_scaffold';
     if (s.includes('บันไดสูง')) return 'install_high';
     if (s.includes('ติดตั้ง') && s.includes('นั่งร้าน')) return 'install_scaffold';
-    if (s.includes('แก้ไข') && s.includes('นั่งร้าน')) return 'fix_scaffold';
     if (/wall\s*linen/i.test(s) || s.includes('วอลล์ลิเนน')) return 'install_wall_linen';
     if (/wall\s*mural/i.test(s) || s.includes('วอลล์มิวรัล')) return 'install_wall_mural';
     if (s.includes('วัดพื้นที่')) return 'measure';
@@ -178,6 +197,9 @@ export const JobManagement: React.FC<JobManagementProps> = ({
     if (s.includes('เดินทางไป')) return 'travel_go';
     if (s.includes('เดินทางกลับ')) return 'travel_back';
     if (s.includes('ติดตั้ง')) return 'install';
+
+    const matchedCustom = availableJobTypes.find(t => s === t.label || s === t.id || s.toLowerCase() === t.label.toLowerCase());
+    if (matchedCustom) return matchedCustom.id;
 
     return 'install';
   };
@@ -825,7 +847,18 @@ export const JobManagement: React.FC<JobManagementProps> = ({
                     required
                     className="w-full border rounded-xl p-2 font-bold text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-300"
                     value={newDate}
-                    onChange={e => setNewDate(e.target.value)}
+                    onChange={e => {
+                      const selectedDate = e.target.value;
+                      setNewDate(selectedDate);
+                      setNewSelectedTechs(prev => prev.filter(techId => {
+                        const l = (leaves || []).find(item => item.techId === techId && item.date === selectedDate);
+                        const m = (teams || []).flatMap(t => t.members || []).find(mem => mem.id === techId);
+                        const isLeave = !!(l && l.type !== 'no_inc');
+                        const isResigned = m?.resignDate && selectedDate >= m.resignDate;
+                        const isNotYet = m?.joinDate && selectedDate < m.joinDate;
+                        return !isLeave && !isResigned && !isNotYet;
+                      }));
+                    }}
                   />
                 </div>
                 <div>
@@ -940,21 +973,44 @@ export const JobManagement: React.FC<JobManagementProps> = ({
                       <div className="flex flex-wrap gap-1.5">
                         {(team.members || []).filter(Boolean).map(member => {
                           const isSelected = newSelectedTechs.includes(member.id);
+                          const leave = (leaves || []).find(l => l.techId === member.id && l.date === newDate);
+                          const isNoInc = leave?.type === 'no_inc';
+                          const isLeave = !!(leave && !isNoInc);
+                          const isResigned = member.resignDate && newDate >= member.resignDate;
+                          const isNotYetJoined = member.joinDate && newDate < member.joinDate;
+                          const isDisabled = isLeave || isResigned || isNotYetJoined;
+
+                          let disabledReason = '';
+                          if (isLeave) {
+                            const leaveLabel = leave?.type === 'sick' ? 'ลาป่วย' : leave?.type === 'business' ? 'ลากิจ' : leave?.type === 'vacation' ? 'พักร้อน' : 'ลา';
+                            disabledReason = ` (${leaveLabel})`;
+                          } else if (isResigned) {
+                            disabledReason = ' (ลาออก)';
+                          } else if (isNotYetJoined) {
+                            disabledReason = ' (ยังไม่เริ่มงาน)';
+                          }
+
                           return (
                             <button
                               type="button"
                               key={member.id}
+                              disabled={isDisabled}
                               onClick={() => toggleModalTech(member.id)}
+                              title={isDisabled ? `${member?.name} ไม่สามารถเลือกได้: ${disabledReason}` : member?.name}
                               style={
-                                isSelected
+                                isSelected && !isDisabled
                                   ? { backgroundColor: themeColor, color: themeTextColor }
                                   : {}
                               }
                               className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
-                                !isSelected ? 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100' : ''
+                                isDisabled
+                                  ? 'bg-gray-100 border-gray-200 text-gray-400 opacity-50 cursor-not-allowed line-through'
+                                  : isSelected
+                                  ? ''
+                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100 cursor-pointer'
                               }`}
                             >
-                              {member?.name || ''}
+                              {member?.name || ''}{disabledReason}
                             </button>
                           );
                         })}

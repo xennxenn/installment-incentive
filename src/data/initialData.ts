@@ -96,6 +96,16 @@ export const JOB_TYPES: JobTypeConfig[] = [
     description: 'คิดสูตรผ้าม่านมาตรฐาน'
   },
   { 
+    id: 'fix_high', 
+    label: 'งานแก้ไข/บันไดสูง', 
+    unitType: 'rails', 
+    unitLabel: 'ราง', 
+    calcFormulaType: 'curtain_standard', 
+    bonusAmount: 100, 
+    isSystem: true,
+    description: 'คิดสูตรมาตรฐาน + โบนัสบันไดสูง 100 บาท'
+  },
+  { 
     id: 'fix_scaffold', 
     label: 'งานแก้ไข/นั่งร้าน', 
     unitType: 'rails', 

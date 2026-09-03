@@ -149,51 +149,75 @@ export function getEffectiveRulesForPeriod(
   ruleVersions?: RuleVersion[],
   periodRulesMap?: Record<string, IncentiveRules>
 ): IncentiveRules {
-  if (!period) return currentRules || DEFAULT_INCENTIVE_RULES;
+  let matchedRules: IncentiveRules | null = null;
 
-  // 1. Direct period-specific mapping by period ID or name
-  if (periodRulesMap) {
-    if (period.id && periodRulesMap[period.id]) {
-      return { ...DEFAULT_INCENTIVE_RULES, ...periodRulesMap[period.id] };
+  if (period) {
+    // 1. Direct period-specific mapping by period ID or name
+    if (periodRulesMap) {
+      if (period.id && periodRulesMap[period.id]) {
+        matchedRules = periodRulesMap[period.id];
+      } else if (period.name && periodRulesMap[period.name]) {
+        matchedRules = periodRulesMap[period.name];
+      }
     }
-    if (period.name && periodRulesMap[period.name]) {
-      return { ...DEFAULT_INCENTIVE_RULES, ...periodRulesMap[period.name] };
+
+    // 2. Rule versioning lookup
+    if (!matchedRules && ruleVersions && Array.isArray(ruleVersions) && ruleVersions.length > 0) {
+      // Priority:
+      // A) specific_period_only matching period.id
+      const specific = ruleVersions.find(
+        v => v.scope === 'specific_period_only' && (v.specificPeriodId === period.id || v.effectiveFromPeriodId === period.id)
+      );
+      if (specific && specific.rules) {
+        matchedRules = specific.rules;
+      } else {
+        // B) from_period_onward matching period.start >= version.effectiveFromDate
+        const periodStart = period.start || '2000-01-01';
+        const onwardMatches = ruleVersions
+          .filter(v => v.scope === 'from_period_onward' && v.effectiveFromDate && periodStart >= v.effectiveFromDate)
+          .sort((a, b) => (b.effectiveFromDate || '').localeCompare(a.effectiveFromDate || '') || (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+        if (onwardMatches.length > 0 && onwardMatches[0].rules) {
+          matchedRules = onwardMatches[0].rules;
+        } else {
+          // C) all_periods version (latest)
+          const allMatches = ruleVersions
+            .filter(v => v.scope === 'all_periods')
+            .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+          if (allMatches.length > 0 && allMatches[0].rules) {
+            matchedRules = allMatches[0].rules;
+          }
+        }
+      }
     }
   }
 
-  // 2. Rule versioning lookup
-  if (ruleVersions && Array.isArray(ruleVersions) && ruleVersions.length > 0) {
-    // Filter versions that apply to this period
-    // Priority:
-    // A) specific_period_only matching period.id
-    const specific = ruleVersions.find(
-      v => v.scope === 'specific_period_only' && (v.specificPeriodId === period.id || v.effectiveFromPeriodId === period.id)
-    );
-    if (specific && specific.rules) {
-      return { ...DEFAULT_INCENTIVE_RULES, ...specific.rules };
+  const baseResult = matchedRules || currentRules || DEFAULT_INCENTIVE_RULES;
+
+  // Always guarantee customJobTypes preserves all system JOB_TYPES and all user-configured types
+  const typesMap = new Map<string, JobTypeConfig>();
+  JOB_TYPES.forEach(t => typesMap.set(t.id, t));
+  (currentRules?.customJobTypes || []).forEach(t => {
+    if (typesMap.has(t.id)) {
+      typesMap.set(t.id, { ...typesMap.get(t.id)!, ...t });
+    } else {
+      typesMap.set(t.id, t);
     }
-
-    // B) from_period_onward matching period.start >= version.effectiveFromDate
-    const periodStart = period.start || '2000-01-01';
-    const onwardMatches = ruleVersions
-      .filter(v => v.scope === 'from_period_onward' && v.effectiveFromDate && periodStart >= v.effectiveFromDate)
-      .sort((a, b) => (b.effectiveFromDate || '').localeCompare(a.effectiveFromDate || '') || (b.createdAt || '').localeCompare(a.createdAt || ''));
-
-    if (onwardMatches.length > 0 && onwardMatches[0].rules) {
-      return { ...DEFAULT_INCENTIVE_RULES, ...onwardMatches[0].rules };
+  });
+  (baseResult.customJobTypes || []).forEach(t => {
+    if (typesMap.has(t.id)) {
+      typesMap.set(t.id, { ...typesMap.get(t.id)!, ...t });
+    } else {
+      typesMap.set(t.id, t);
     }
+  });
 
-    // C) all_periods version (latest)
-    const allMatches = ruleVersions
-      .filter(v => v.scope === 'all_periods')
-      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-
-    if (allMatches.length > 0 && allMatches[0].rules) {
-      return { ...DEFAULT_INCENTIVE_RULES, ...allMatches[0].rules };
-    }
-  }
-
-  return currentRules || DEFAULT_INCENTIVE_RULES;
+  return {
+    ...DEFAULT_INCENTIVE_RULES,
+    ...baseResult,
+    customJobTypes: Array.from(typesMap.values())
+  };
 }
 
 /**
@@ -289,7 +313,7 @@ export function calculateSingleJobIncentive(
     const extraRails = railsOrSqm > freeRails ? (railsOrSqm - freeRails) * extraRate : 0;
 
     let specialBonus = 0;
-    if (jobType === 'install_high') {
+    if (jobType === 'install_high' || jobType === 'fix_high') {
       specialBonus = safeRules.highLadderBonus !== undefined ? safeRules.highLadderBonus : (currentTypeConfig.bonusAmount ?? 0);
     } else if (jobType === 'install_scaffold' || jobType === 'fix_scaffold') {
       specialBonus = safeRules.scaffoldBonus !== undefined ? safeRules.scaffoldBonus : (currentTypeConfig.bonusAmount ?? 0);
@@ -306,7 +330,7 @@ export function calculateSingleJobIncentive(
   const extraRate = safeRules.extraRailRate ?? 20;
   const extraRails = railsOrSqm > freeRails ? (railsOrSqm - freeRails) * extraRate : 0;
   let specialBonus = 0;
-  if (jobType === 'install_high') specialBonus = safeRules.highLadderBonus ?? 0;
+  if (jobType === 'install_high' || jobType === 'fix_high') specialBonus = safeRules.highLadderBonus ?? 0;
   if (jobType === 'install_scaffold' || jobType === 'fix_scaffold') specialBonus = safeRules.scaffoldBonus ?? 0;
 
   return basePay + extraRails + specialBonus;

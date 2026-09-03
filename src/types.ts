@@ -31,6 +31,7 @@ export type JobTypeId =
   | 'install_wall_linen'
   | 'install_wall_mural'
   | 'fix' 
+  | 'fix_high'
   | 'fix_scaffold' 
   | 'fix_free'
   | string;

@@ -111,6 +111,20 @@
       page-break-inside: avoid !important;
     }
   }
+
+  .report-table thead tr.table-column-header th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: #f1f5f9;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  }
+
+  .report-scroll-container {
+    max-height: calc(100vh - 160px);
+    overflow-y: auto;
+    overflow-x: auto;
+  }
 }
 
 

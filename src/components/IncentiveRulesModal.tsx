@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Sliders, X, Check, RotateCcw, Plus, Trash2, Tag, HelpCircle, 
   Layers, Calendar, History, Sparkles, AlertCircle, Clock, Pencil, Save, ArrowRight
@@ -31,7 +31,7 @@ export const syncJobTypesWithRules = (
         copy.baseAttendancePerTech = updatedRules.baseTechPay;
         copy.description = `คิดฐานค่าช่าง ${updatedRules.baseTechPay} บาท/คน + รางส่วนเกิน`;
       }
-    } else if (copy.id === 'install_high') {
+    } else if (copy.id === 'install_high' || copy.id === 'fix_high') {
       if (updatedRules.baseTechPay !== undefined) {
         copy.baseAttendancePerTech = updatedRules.baseTechPay;
       }
@@ -106,6 +106,30 @@ export const IncentiveRulesModal: React.FC<IncentiveRulesModalProps> = ({
       customJobTypes: syncJobTypesWithRules(initialTypes, mergedRules)
     };
   });
+
+  // Keep formData in sync whenever modal opens or rules change
+  useEffect(() => {
+    if (isOpen) {
+      const mergedRules = { ...DEFAULT_INCENTIVE_RULES, ...rules };
+      const currentConfigured = mergedRules.customJobTypes && mergedRules.customJobTypes.length > 0
+        ? mergedRules.customJobTypes
+        : JOB_TYPES;
+      const map = new Map<string, JobTypeConfig>();
+      JOB_TYPES.forEach(t => map.set(t.id, t));
+      currentConfigured.forEach(t => {
+        if (map.has(t.id)) {
+          map.set(t.id, { ...map.get(t.id)!, ...t });
+        } else {
+          map.set(t.id, t);
+        }
+      });
+      const allTypes = Array.from(map.values());
+      setFormData({
+        ...mergedRules,
+        customJobTypes: syncJobTypesWithRules(allTypes, mergedRules)
+      });
+    }
+  }, [isOpen, rules]);
 
   // Scope & Effective Period states
   const defaultPeriodId = currentPeriod?.id || (payPeriods && payPeriods[0]?.id) || '';
@@ -185,10 +209,21 @@ export const IncentiveRulesModal: React.FC<IncentiveRulesModalProps> = ({
     };
 
     const currentTypes = formData.customJobTypes || JOB_TYPES;
-    setFormData({
+    const updatedTypes = [...currentTypes, newConfig];
+    const newFormData: IncentiveRules = {
       ...formData,
-      customJobTypes: [...currentTypes, newConfig]
-    });
+      customJobTypes: updatedTypes
+    };
+    setFormData(newFormData);
+
+    // Save immediately so it propagates to JobManagement and Firestore without needing another click!
+    const saveOptions: PeriodRuleSaveOptions = {
+      scope: scope,
+      targetPeriodId: selectedPeriodId || targetPeriodObj?.id || 'current',
+      targetPeriodName: targetPeriodObj?.name || 'รอบปัจจุบัน',
+      targetPeriodStartDate: targetPeriodObj?.start
+    };
+    onSaveRules(newFormData, saveOptions);
 
     // Reset
     setNewTypeLabel('');
@@ -206,7 +241,7 @@ export const IncentiveRulesModal: React.FC<IncentiveRulesModalProps> = ({
 
     // Sync back to main formData fields for linked system types
     const updatedRulesPartial: Partial<IncentiveRules> = {};
-    if (editingJobType.id === 'install_high') {
+    if (editingJobType.id === 'install_high' || editingJobType.id === 'fix_high') {
       updatedRulesPartial.highLadderBonus = editingJobType.bonusAmount ?? 0;
       if (editingJobType.baseAttendancePerTech !== undefined) {
         updatedRulesPartial.baseTechPay = editingJobType.baseAttendancePerTech;
@@ -230,21 +265,40 @@ export const IncentiveRulesModal: React.FC<IncentiveRulesModalProps> = ({
       }
     }
 
-    setFormData({
+    const newFormData: IncentiveRules = {
       ...formData,
       ...updatedRulesPartial,
       customJobTypes: updatedTypes
-    });
+    };
+    setFormData(newFormData);
+
+    const saveOptions: PeriodRuleSaveOptions = {
+      scope: scope,
+      targetPeriodId: selectedPeriodId || targetPeriodObj?.id || 'current',
+      targetPeriodName: targetPeriodObj?.name || 'รอบปัจจุบัน',
+      targetPeriodStartDate: targetPeriodObj?.start
+    };
+    onSaveRules(newFormData, saveOptions);
 
     setEditingJobType(null);
   };
 
   const handleDeleteJobType = (id: string) => {
     const currentTypes = formData.customJobTypes || JOB_TYPES;
-    setFormData({
+    const updatedTypes = currentTypes.filter(t => t.id !== id);
+    const newFormData: IncentiveRules = {
       ...formData,
-      customJobTypes: currentTypes.filter(t => t.id !== id)
-    });
+      customJobTypes: updatedTypes
+    };
+    setFormData(newFormData);
+
+    const saveOptions: PeriodRuleSaveOptions = {
+      scope: scope,
+      targetPeriodId: selectedPeriodId || targetPeriodObj?.id || 'current',
+      targetPeriodName: targetPeriodObj?.name || 'รอบปัจจุบัน',
+      targetPeriodStartDate: targetPeriodObj?.start
+    };
+    onSaveRules(newFormData, saveOptions);
   };
 
   const currentJobTypes = formData.customJobTypes && formData.customJobTypes.length > 0
