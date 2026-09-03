@@ -168,7 +168,7 @@ export const Reports: React.FC<ReportsProps> = ({
                 {/* Document Header Row (Repeating on every page) - Clean Flex without nested tables */}
                 <tr className="print-header-row">
                   <th colSpan={7} className="print-header-cell border-none p-0 pb-2 font-normal text-left bg-transparent">
-                    <div className="pb-2 mb-2">
+                    <div className="border-b-2 border-gray-900 pb-2 mb-2">
                       <div className="flex justify-between items-start gap-4">
                         <div className="flex items-start gap-3">
                           <img src={LOGO_URL} alt="PASAYA" className="h-[44px] w-auto object-contain block flex-shrink-0" />
@@ -342,8 +342,8 @@ export const Reports: React.FC<ReportsProps> = ({
               </tbody>
             </table>
 
-            {/* Official 4-Box Signature Block - matching screenshot 172929 spacing, no top border */}
-            <div className="mt-8 text-xs text-gray-800 print-signature-block">
+            {/* Official 4-Box Signature Block */}
+            <div className="mt-6 pt-3 border-t border-gray-300 text-xs text-gray-800 print-signature-block">
               <div className="font-bold text-center mb-9 text-gray-900 text-xs tracking-wider uppercase">
                 ช่องทางลงนามและอนุมัติ (OFFICIAL SIGN-OFF & APPROVAL)
               </div>
@@ -383,7 +383,7 @@ export const Reports: React.FC<ReportsProps> = ({
                     <thead>
                       <tr className="print-header-row">
                         <th colSpan={10} className="print-header-cell border-none p-0 pb-2 font-normal text-left bg-transparent">
-                          <div className="pb-2 mb-2">
+                          <div className="border-b-2 border-gray-900 pb-2 mb-2">
                             <div className="flex justify-between items-start gap-4">
                               <div className="flex items-start gap-3">
                                 <img src={LOGO_URL} alt="PASAYA" className="h-[44px] w-auto object-contain block flex-shrink-0" />
@@ -526,8 +526,8 @@ export const Reports: React.FC<ReportsProps> = ({
                   </table>
                 </div>
 
-                {/* Official Sign-off Approval Block - matching screenshot 172929 spacing, no top border */}
-                <div className="mt-8 text-xs text-gray-800 print-signature-block">
+                {/* Official Sign-off Approval Block */}
+                <div className="mt-6 pt-3 border-t border-gray-300 text-xs text-gray-800 print-signature-block">
                   <div className="font-bold text-center mb-9 text-gray-900 text-xs tracking-wider uppercase">
                     ช่องทางลงนามและอนุมัติ (OFFICIAL SIGN-OFF & APPROVAL)
                   </div>
@@ -563,7 +563,7 @@ export const Reports: React.FC<ReportsProps> = ({
                     <thead>
                       <tr className="print-header-row">
                         <th colSpan={10} className="print-header-cell border-none p-0 pb-2 font-normal text-left bg-transparent">
-                          <div className="pb-2 mb-2">
+                          <div className="border-b-2 border-gray-900 pb-2 mb-2">
                             <div className="flex justify-between items-start gap-4">
                               <div className="flex items-start gap-3">
                                 <img src={LOGO_URL} alt="PASAYA" className="h-[44px] w-auto object-contain block flex-shrink-0" />
@@ -717,8 +717,8 @@ export const Reports: React.FC<ReportsProps> = ({
                   </table>
                 </div>
 
-                {/* Official Sign-off Approval Block - matching screenshot 172929 spacing, no top border */}
-                <div className="mt-8 text-xs text-gray-800 print-signature-block">
+                {/* Official Sign-off Approval Block */}
+                <div className="mt-6 pt-3 border-t border-gray-300 text-xs text-gray-800 print-signature-block">
                   <div className="font-bold text-center mb-9 text-gray-900 text-xs tracking-wider uppercase">
                     ช่องทางลงนามและอนุมัติ (OFFICIAL SIGN-OFF & APPROVAL)
                   </div>
@@ -752,7 +752,7 @@ export const Reports: React.FC<ReportsProps> = ({
                 <thead>
                   <tr className="print-header-row">
                     <th colSpan={6} className="print-header-cell border-none p-0 pb-2 font-normal text-left bg-transparent">
-                      <div className="pb-2 mb-2">
+                      <div className="border-b-2 border-gray-900 pb-2 mb-2">
                         <div className="flex justify-between items-start gap-4">
                           <div className="flex items-start gap-3">
                             <img src={LOGO_URL} alt="PASAYA" className="h-[44px] w-auto object-contain block flex-shrink-0" />
@@ -967,8 +967,8 @@ export const Reports: React.FC<ReportsProps> = ({
               </table>
             </div>
 
-            {/* Official Sign-off Approval Block - matching screenshot 172929 spacing, no top border */}
-            <div className="mt-8 text-xs text-gray-800 print-signature-block">
+            {/* Official Sign-off Approval Block */}
+            <div className="mt-6 pt-3 border-t border-gray-300 text-xs text-gray-800 print-signature-block">
               <div className="font-bold text-center mb-9 text-gray-900 text-xs tracking-wider uppercase">
                 ช่องทางลงนามและอนุมัติ (OFFICIAL SIGN-OFF & APPROVAL)
               </div>
