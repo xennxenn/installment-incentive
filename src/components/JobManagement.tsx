@@ -119,7 +119,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
     const leave = (leaves || []).find(l => l.techId === techId && l.date === newDate);
     const isLeave = !!(leave && leave.type !== 'no_inc');
     const member = (teams || []).flatMap(t => t.members || []).find(m => m.id === techId);
-    const isResigned = member?.resignDate && newDate >= member.resignDate;
+    const isResigned = member?.resignDate && newDate > member.resignDate;
     const isNotYetJoined = member?.joinDate && newDate < member.joinDate;
 
     if (isLeave || isResigned || isNotYetJoined) return;
@@ -1013,7 +1013,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
                               const isNoInc = leave?.type === 'no_inc';
                               const isLeave = leave && !isNoInc;
 
-                              const isResigned = member.resignDate && job.date >= member.resignDate;
+                              const isResigned = member.resignDate && job.date > member.resignDate;
                               const isNotYetJoined = member.joinDate && job.date < member.joinDate;
                               const isDisabled = isLeave || isResigned || isNotYetJoined;
 
@@ -1203,7 +1203,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
                         const l = (leaves || []).find(item => item.techId === techId && item.date === selectedDate);
                         const m = (teams || []).flatMap(t => t.members || []).find(mem => mem.id === techId);
                         const isLeave = !!(l && l.type !== 'no_inc');
-                        const isResigned = m?.resignDate && selectedDate >= m.resignDate;
+                        const isResigned = m?.resignDate && selectedDate > m.resignDate;
                         const isNotYet = m?.joinDate && selectedDate < m.joinDate;
                         return !isLeave && !isResigned && !isNotYet;
                       }));
@@ -1325,7 +1325,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
                           const leave = (leaves || []).find(l => l.techId === member.id && l.date === newDate);
                           const isNoInc = leave?.type === 'no_inc';
                           const isLeave = !!(leave && !isNoInc);
-                          const isResigned = member.resignDate && newDate >= member.resignDate;
+                          const isResigned = member.resignDate && newDate > member.resignDate;
                           const isNotYetJoined = member.joinDate && newDate < member.joinDate;
                           const isDisabled = isLeave || isResigned || isNotYetJoined;
 

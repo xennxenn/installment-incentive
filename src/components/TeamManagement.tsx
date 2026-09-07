@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { 
-  Users, Plus, Trash2, Pencil, ArrowRightLeft, X, Check, UserPlus, Calendar, ArrowRight
+  Users, Plus, Trash2, Pencil, ArrowRightLeft, X, Check, UserPlus, Calendar, ArrowRight,
+  AlertTriangle, AlertCircle, Info, RefreshCw
 } from 'lucide-react';
 import { Team, TeamMember } from '../types';
+import { addDays, formatDateTH } from '../utils/calculator';
 
 interface TeamManagementProps {
   teams: Team[];
@@ -18,6 +20,14 @@ interface TeamManagementProps {
     departureDate: string,
     newTeamJoinDate?: string
   ) => void;
+  onSyncTransferDates?: (
+    oldTeamId: string,
+    oldMemberId: string,
+    newTeamId: string,
+    newMemberId: string,
+    lastWorkingDayOldTeam: string,
+    firstWorkingDayNewTeam: string
+  ) => void;
   onResetTeamsToDefault?: () => void;
   themeColor: string;
   themeTextColor: string;
@@ -31,6 +41,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
   onUpdateMember,
   onDeleteMember,
   onTransferMember,
+  onSyncTransferDates,
   onResetTeamsToDefault,
   themeColor,
   themeTextColor
@@ -61,33 +72,33 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
 
   // Helper to identify if a member was transferred to/from another team
   const getLinkedInfo = (member: TeamMember, currentTeamId: string) => {
+    let type: 'transferred_out' | 'transferred_in' | null = null;
+    let teamName = '';
+    let memberId: string | undefined = undefined;
+    let linkedTeam: Team | null = null;
+    let linkedMember: TeamMember | null = null;
+
     if (member.transferredToTeamName || member.transferredToId) {
-      return {
-        type: 'transferred_out' as const,
-        teamName: member.transferredToTeamName || 'ทีมใหม่',
-        memberId: member.transferredToId
-      };
-    }
-    if (member.transferredFromTeamName || member.transferredFromId) {
-      return {
-        type: 'transferred_in' as const,
-        teamName: member.transferredFromTeamName || 'ทีมเดิม',
-        memberId: member.transferredFromId
-      };
-    }
-    // Heuristic fallback for previously existing data
-    if (member.resignDate) {
+      type = 'transferred_out';
+      memberId = member.transferredToId;
+      teamName = member.transferredToTeamName || '';
+    } else if (member.transferredFromTeamName || member.transferredFromId) {
+      type = 'transferred_in';
+      memberId = member.transferredFromId;
+      teamName = member.transferredFromTeamName || '';
+    } else if (member.resignDate) {
       for (const t of teams) {
         if (t.id === currentTeamId) continue;
         const match = (t.members || []).find(
           m => m.name.trim().toLowerCase() === member.name.trim().toLowerCase() && !m.resignDate
         );
         if (match) {
-          return {
-            type: 'transferred_out' as const,
-            teamName: t.name,
-            memberId: match.id
-          };
+          type = 'transferred_out';
+          teamName = t.name;
+          memberId = match.id;
+          linkedTeam = t;
+          linkedMember = match;
+          break;
         }
       }
     } else {
@@ -97,15 +108,94 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
           m => m.name.trim().toLowerCase() === member.name.trim().toLowerCase() && m.resignDate
         );
         if (match) {
-          return {
-            type: 'transferred_in' as const,
-            teamName: t.name,
-            memberId: match.id
-          };
+          type = 'transferred_in';
+          teamName = t.name;
+          memberId = match.id;
+          linkedTeam = t;
+          linkedMember = match;
+          break;
         }
       }
     }
-    return null;
+
+    if (type && !linkedMember) {
+      for (const t of teams) {
+        if (t.id === currentTeamId) continue;
+        const match = (t.members || []).find(
+          m => (memberId && m.id === memberId) || m.name.trim().toLowerCase() === member.name.trim().toLowerCase()
+        );
+        if (match) {
+          linkedTeam = t;
+          linkedMember = match;
+          if (!teamName) teamName = t.name;
+          break;
+        }
+      }
+    }
+
+    if (!type) return null;
+
+    // Identify who is old team and who is new team
+    const isSourceOldTeam = type === 'transferred_out';
+    const oldTeam = isSourceOldTeam ? teams.find(t => t.id === currentTeamId) : linkedTeam;
+    const oldMember = isSourceOldTeam ? member : linkedMember;
+    const newTeam = isSourceOldTeam ? linkedTeam : teams.find(t => t.id === currentTeamId);
+    const newMember = isSourceOldTeam ? linkedMember : member;
+
+    const oldResignDate = oldMember?.resignDate || '';
+    const newJoinDate = newMember?.joinDate || '';
+
+    // Standard business rule:
+    // - วันสิ้นสุดทีมเก่าคือวันสุดท้ายที่ทำงานของทีมเก่า
+    // - วันเริ่มต้นทีมใหม่คือวันเริ่มทำงานของทีมใหม่ (+1 วันถัดไป)
+    let hasDateConflict = false;
+    let conflictDetails = '';
+    let isPerfectSync = false;
+
+    if (oldResignDate && newJoinDate) {
+      if (newJoinDate === addDays(oldResignDate, 1)) {
+        isPerfectSync = true;
+      } else {
+        hasDateConflict = true;
+        if (newJoinDate <= oldResignDate) {
+          conflictDetails = `วันเริ่มงานทีมใหม่ (${newJoinDate}) ซ้อนทับหรือก่อนหน้าวันสุดท้ายทีมเดิม (${oldResignDate})`;
+        } else {
+          conflictDetails = `มีช่วงเว้นว่างระหว่างวันสิ้นสุดทีมเก่า (${oldResignDate}) กับวันเริ่มทีมใหม่ (${newJoinDate})`;
+        }
+      }
+    }
+
+    return {
+      type,
+      teamName: teamName || (linkedTeam?.name) || 'ทีมปลายทาง',
+      memberId,
+      linkedTeam,
+      linkedMember,
+      oldTeam,
+      oldMember,
+      newTeam,
+      newMember,
+      oldResignDate,
+      newJoinDate,
+      hasDateConflict,
+      conflictDetails,
+      isPerfectSync
+    };
+  };
+
+  const handleApplyTransferSync = (
+    oldTeamId: string,
+    oldMemberId: string,
+    newTeamId: string,
+    newMemberId: string,
+    targetOldResign: string,
+    targetNewJoin: string
+  ) => {
+    if (onSyncTransferDates) {
+      onSyncTransferDates(oldTeamId, oldMemberId, newTeamId, newMemberId, targetOldResign, targetNewJoin);
+    } else {
+      onUpdateMember(oldTeamId, oldMemberId, { resignDate: targetOldResign, transferredToId: newMemberId });
+    }
   };
 
   const handleCreateTeam = () => {
@@ -163,7 +253,8 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
       return {
         ...prev,
         departureDate: val,
-        newTeamJoinDate: val // By default, keep start date at new team in sync with departure date
+        // Rule: new team start date is the NEXT DAY after last working day
+        newTeamJoinDate: val ? addDays(val, 1) : ''
       };
     });
   };
@@ -280,7 +371,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                             <div>
                               <label className="block text-[10px] font-bold text-red-700 mb-0.5 flex items-center gap-1">
                                 <Calendar size={11} />
-                                <span>วันที่ออกจากทีมเก่า ({team.name}):</span>
+                                <span>วันสิ้นสุดทีมเก่า (วันสุดท้ายที่ทำงานใน {team.name}):</span>
                               </label>
                               <input
                                 type="date"
@@ -289,18 +380,23 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                                 onChange={e => handleDepartureDateChange(e.target.value)}
                               />
                               <span className="text-[9px] text-gray-500 mt-0.5 block leading-tight">
-                                สิ้นสุดการคิดงานในทีมเดิม ณ วันนี้
+                                ทำงานสังกัดทีมนี้ถึงวันที่เลือกนี้เป็นวันสุดท้าย
                               </span>
                             </div>
 
                             <div>
                               <label className="block text-[10px] font-bold text-emerald-700 mb-0.5 flex items-center gap-1">
                                 <Calendar size={11} />
-                                <span>วันที่เริ่มงานสำหรับทีมใหม่:</span>
+                                <span>วันเริ่มต้นทีมใหม่ (วันเริ่มทำงานในทีมใหม่):</span>
                               </label>
                               <input
                                 type="date"
-                                className="w-full border border-emerald-200 rounded-lg p-1.5 text-xs bg-white focus:ring-1 focus:ring-emerald-400 font-semibold text-gray-800"
+                                min={transferringMember.departureDate ? addDays(transferringMember.departureDate, 1) : undefined}
+                                className={`w-full border rounded-lg p-1.5 text-xs bg-white focus:ring-1 font-semibold text-gray-800 ${
+                                  transferringMember.departureDate && transferringMember.newTeamJoinDate && transferringMember.newTeamJoinDate <= transferringMember.departureDate
+                                    ? 'border-red-400 focus:ring-red-400 bg-red-50/50'
+                                    : 'border-emerald-200 focus:ring-emerald-400'
+                                }`}
                                 value={transferringMember.newTeamJoinDate}
                                 onChange={e =>
                                   setTransferringMember({
@@ -309,26 +405,71 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                                   })
                                 }
                               />
-                              <span className="text-[9px] text-emerald-600 mt-0.5 block leading-tight font-medium">
-                                ✓ ซิงค์ตรงกับวันย้าย (เริ่มคิดงานทีมใหม่)
-                              </span>
+                              <div className="flex items-center justify-between mt-0.5">
+                                <span className="text-[9px] text-emerald-600 leading-tight font-medium">
+                                  ✓ เริ่มงานทีมใหม่อัตโนมัติ (วันถัดไป)
+                                </span>
+                                {transferringMember.departureDate && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setTransferringMember({
+                                        ...transferringMember,
+                                        newTeamJoinDate: addDays(transferringMember.departureDate, 1)
+                                      })
+                                    }
+                                    className="text-[9px] text-blue-600 hover:underline font-bold"
+                                  >
+                                    ซิงค์วันถัดไป
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
+
+                          {/* Warning if newTeamJoinDate is on or before departureDate */}
+                          {transferringMember.departureDate &&
+                            transferringMember.newTeamJoinDate &&
+                            transferringMember.newTeamJoinDate <= transferringMember.departureDate && (
+                              <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-[11px] text-red-700 flex items-start gap-1.5">
+                                <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
+                                <div className="space-y-1">
+                                  <p className="font-bold leading-tight">
+                                    วันที่ไม่สอดคล้องกัน: วันเริ่มงานทีมใหม่ ({transferringMember.newTeamJoinDate}) ต้องเป็นวันถัดไปจากวันสุดท้ายที่ทำงานของทีมเก่า ({transferringMember.departureDate})
+                                  </p>
+                                  <p className="text-[10px] text-red-600 leading-tight">
+                                    เนื่องจากวันสิ้นสุดทีมเก่าคือวันสุดท้ายที่ทำงานของทีมเก่า และวันเริ่มต้นทีมใหม่คือวันเริ่มทำงานของทีมใหม่
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setTransferringMember({
+                                        ...transferringMember,
+                                        newTeamJoinDate: addDays(transferringMember.departureDate, 1)
+                                      })
+                                    }
+                                    className="px-2.5 py-1 bg-white border border-red-300 hover:bg-red-100 text-red-800 rounded-lg font-semibold text-[10px] transition-colors shadow-2xs"
+                                  >
+                                    ⚡ ซิงค์อัตโนมัติ: ให้ทีมใหม่เริ่มงาน {addDays(transferringMember.departureDate, 1)}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
 
                           {/* Preview Summary */}
                           {transferringMember.targetTeamId && (
                             <div className="p-2 rounded-lg bg-blue-100/70 border border-blue-200 text-[11px] text-blue-900 space-y-1">
                               <div className="font-bold flex items-center gap-1 text-[10px] uppercase text-blue-800">
-                                <span>📋 สรุปผลการย้ายทีม:</span>
+                                <span>📋 สรุปผลการย้ายทีม (ซิงค์อัตโนมัติ):</span>
                               </div>
                               <div className="flex flex-col gap-0.5 text-[10px]">
                                 <div className="flex items-center gap-1">
                                   <span className="text-red-700 font-bold">• ทีมเดิม ({team.name}):</span>
-                                  <span>ออกจากทีมวันที่ <b className="text-red-700">{transferringMember.departureDate}</b></span>
+                                  <span>วันสุดท้ายที่ทำงานคือ <b className="text-red-700">{transferringMember.departureDate || '-'}</b></span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <span className="text-emerald-700 font-bold">• ทีมใหม่ ({teams.find(t => t.id === transferringMember.targetTeamId)?.name || 'ทีมปลายทาง'}):</span>
-                                  <span>เริ่มงานวันที่ <b className="text-emerald-700">{transferringMember.newTeamJoinDate}</b></span>
+                                  <span>เริ่มทำงานวันที่ <b className="text-emerald-700">{transferringMember.newTeamJoinDate || '-'}</b></span>
                                 </div>
                               </div>
                             </div>
@@ -337,7 +478,12 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                           <div className="flex gap-2 pt-1">
                             <button
                               onClick={handleConfirmTransfer}
-                              disabled={!transferringMember.targetTeamId || !transferringMember.departureDate || !transferringMember.newTeamJoinDate}
+                              disabled={
+                                !transferringMember.targetTeamId ||
+                                !transferringMember.departureDate ||
+                                !transferringMember.newTeamJoinDate ||
+                                transferringMember.newTeamJoinDate <= transferringMember.departureDate
+                              }
                               className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-1.5 rounded-lg font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-1.5"
                             >
                               <Check size={14} />
@@ -429,8 +575,8 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                               <span className="font-bold shrink-0">⚡ ซิงค์อัตโนมัติ:</span>
                               <span className="leading-tight">
                                 {linked.type === 'transferred_out'
-                                  ? `เมื่อบันทึก วันที่ออกจากทีมนี้จะถูกนำไปอัปเดตเป็นวันเริ่มงานของทีม ${linked.teamName} โดยอัตโนมัติ`
-                                  : `เมื่อบันทึก วันเริ่มงานของทีมนี้จะถูกนำไปอัปเดตเป็นวันที่ออกจากทีมเดิม (${linked.teamName}) โดยอัตโนมัติ`}
+                                  ? `เมื่อบันทึก วันสุดท้ายที่ทำงานของทีมนี้ ระบบจะอัปเดตวันเริ่มงานของทีม ${linked.teamName} เป็นวันถัดไปโดยอัตโนมัติ`
+                                  : `เมื่อบันทึก วันเริ่มงานของทีมนี้ ระบบจะอัปเดตวันสุดท้ายที่ทำงานของทีมเดิม (${linked.teamName}) เป็นวันก่อนหน้าโดยอัตโนมัติ`}
                               </span>
                             </div>
                           )}
@@ -485,27 +631,131 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                             </div>
                             <div className="text-[10px] text-gray-500 mt-0.5 flex flex-wrap items-center gap-x-2">
                               <span>
-                                {linked?.type === 'transferred_in' ? 'วันที่เริ่มงานทีมนี้: ' : 'เริ่ม: '}
+                                {linked?.type === 'transferred_in' ? 'วันเริ่มงาน (ทีมใหม่): ' : 'เริ่มงาน: '}
                                 <b className="text-gray-700 font-medium">{member.joinDate || '-'}</b>
                               </span>
                               {member.resignDate && (
                                 <span className="text-red-600">
-                                  • วันที่ออกจากทีม: <b className="font-semibold">{member.resignDate}</b>
+                                  • วันสุดท้ายที่ทำงาน (ทีมเดิม): <b className="font-semibold">{member.resignDate}</b>
                                 </span>
                               )}
                             </div>
+
+                            {/* Alert if date is conflicting between old and new team */}
+                            {linked?.hasDateConflict && linked.oldTeam && linked.newTeam && linked.oldMember && linked.newMember && (
+                              <div className="mt-2 p-2.5 bg-amber-50/95 border border-amber-300 rounded-xl text-[10px] text-amber-900 space-y-2 shadow-xs">
+                                <div className="font-bold flex items-center gap-1.5 text-amber-900 text-[11px]">
+                                  <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                                  <span>⚠️ ตรวจพบวันย้ายทีมไม่สอดคล้องกัน (ต้องซิงค์ข้อมูลอัตโนมัติ)</span>
+                                </div>
+                                <div className="bg-white/90 p-2 rounded-lg border border-amber-200 text-[10px] space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-gray-600">วันสิ้นสุดทีมเก่า ({linked.oldTeam.name}):</span>
+                                    <b className="text-red-700">{linked.oldResignDate || 'ยังไม่ระบุ'}</b>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-gray-600">วันเริ่มต้นทีมใหม่ ({linked.newTeam.name}):</span>
+                                    <b className="text-emerald-700">{linked.newJoinDate || 'ยังไม่ระบุ'}</b>
+                                  </div>
+                                  <p className="text-[9px] text-amber-800 font-medium pt-0.5 border-t border-amber-100">
+                                    📌 กฎของระบบ: วันสิ้นสุดทีมเก่าคือวันสุดท้ายที่ทำงาน • วันเริ่มต้นทีมใหม่คือวันเริ่มทำงาน (วันถัดไป)
+                                  </p>
+                                </div>
+
+                                <div className="flex flex-col gap-1.5 pt-0.5">
+                                  {/* If inverted (e.g. old is 27 and new is 26): smart swap so old is 26 and new is 27 */}
+                                  {linked.oldResignDate && linked.newJoinDate && linked.newJoinDate <= linked.oldResignDate && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const earlier = linked.newJoinDate < linked.oldResignDate ? linked.newJoinDate : addDays(linked.oldResignDate, -1);
+                                        const later = addDays(earlier, 1);
+                                        handleApplyTransferSync(
+                                          linked.oldTeam!.id,
+                                          linked.oldMember!.id,
+                                          linked.newTeam!.id,
+                                          linked.newMember!.id,
+                                          earlier,
+                                          later
+                                        );
+                                      }}
+                                      className="w-full text-left px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[10px] transition-colors shadow-2xs flex items-center justify-between"
+                                    >
+                                      <span className="flex items-center gap-1.5">
+                                        <RefreshCw size={11} className="shrink-0" />
+                                        <span>⚡ ซิงค์อัตโนมัติ: สิ้นสุดทีมเก่า {linked.newJoinDate < linked.oldResignDate ? linked.newJoinDate : addDays(linked.oldResignDate, -1)} ➔ เริ่มทีมใหม่ {addDays(linked.newJoinDate < linked.oldResignDate ? linked.newJoinDate : addDays(linked.oldResignDate, -1), 1)}</span>
+                                      </span>
+                                      <span className="text-[9px] bg-emerald-700/80 px-1.5 py-0.5 rounded text-white font-medium">แนะนำ</span>
+                                    </button>
+                                  )}
+
+                                  {/* Option 2: Keep old team resignDate, set new team joinDate to addDays(oldResignDate, 1) */}
+                                  {linked.oldResignDate && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleApplyTransferSync(
+                                          linked.oldTeam!.id,
+                                          linked.oldMember!.id,
+                                          linked.newTeam!.id,
+                                          linked.newMember!.id,
+                                          linked.oldResignDate,
+                                          addDays(linked.oldResignDate, 1)
+                                        );
+                                      }}
+                                      className="w-full text-left px-2.5 py-1.5 bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 rounded-lg font-semibold text-[9.5px] transition-colors shadow-2xs flex items-center gap-1"
+                                    >
+                                      <span>⚡ ยึดวันสิ้นสุดทีมเก่า ({linked.oldResignDate}) ➔ ปรับทีมใหม่เริ่มงาน {addDays(linked.oldResignDate, 1)}</span>
+                                    </button>
+                                  )}
+
+                                  {/* Option 3: Keep new team joinDate, set old team resignDate to addDays(newJoinDate, -1) */}
+                                  {linked.newJoinDate && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleApplyTransferSync(
+                                          linked.oldTeam!.id,
+                                          linked.oldMember!.id,
+                                          linked.newTeam!.id,
+                                          linked.newMember!.id,
+                                          addDays(linked.newJoinDate, -1),
+                                          linked.newJoinDate
+                                        );
+                                      }}
+                                      className="w-full text-left px-2.5 py-1.5 bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 rounded-lg font-semibold text-[9.5px] transition-colors shadow-2xs flex items-center gap-1"
+                                    >
+                                      <span>⚡ ยึดวันเริ่มทีมใหม่ ({linked.newJoinDate}) ➔ ปรับทีมเก่าทำงานวันสุดท้าย {addDays(linked.newJoinDate, -1)}</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Reassuring green sync badge */}
+                            {linked?.isPerfectSync && (
+                              <div className="mt-1.5 flex items-center gap-1 text-[9.5px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md font-medium">
+                                <Check size={11} className="text-emerald-600 shrink-0" />
+                                <span>
+                                  {linked.type === 'transferred_out'
+                                    ? `ซิงค์เชื่อมโยงแล้ว (วันสุดท้ายทีมเดิม: ${linked.oldResignDate} ➔ เริ่มงานทีมใหม่: ${linked.newJoinDate})`
+                                    : `ซิงค์เชื่อมโยงแล้ว (ย้ายมาจาก ${linked.teamName}: วันสุดท้าย ${linked.oldResignDate} ➔ เริ่มงานทีมนี้ ${linked.newJoinDate})`}
+                                </span>
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-1 shrink-0">
                             <button
                               onClick={() => {
                                 const today = new Date().toISOString().split('T')[0];
+                                const tomorrow = addDays(today, 1);
                                 setTransferringMember({
                                   teamId: team.id,
                                   member,
                                   targetTeamId: '',
                                   departureDate: today,
-                                  newTeamJoinDate: today
+                                  newTeamJoinDate: tomorrow
                                 });
                               }}
                               className="p-1 text-gray-400 hover:text-blue-600 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-colors"

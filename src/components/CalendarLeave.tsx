@@ -62,7 +62,7 @@ export const CalendarLeave: React.FC<CalendarLeaveProps> = ({
   const visibleMembers = allMembers.filter(m => {
     const hasActiveDay = daysInPeriod.some(dStr => {
       const isJoined = !m.joinDate || m.joinDate <= dStr;
-      const isNotResigned = !m.resignDate || dStr < m.resignDate;
+      const isNotResigned = !m.resignDate || dStr <= m.resignDate;
       return isJoined && isNotResigned;
     });
     const hasLeave = leaves.some(l => l.techId === m.id && daysInPeriod.includes(l.date));
@@ -239,7 +239,7 @@ export const CalendarLeave: React.FC<CalendarLeaveProps> = ({
                     <div className="text-[9px] text-gray-400 font-normal flex items-center gap-1 mt-0.5">
                       <span>{member.teamName}</span>
                       {member.resignDate && (
-                        <span className="text-amber-600 font-medium">• ย้ายออก {member.resignDate}</span>
+                        <span className="text-amber-600 font-medium">• สิ้นสุด {member.resignDate}</span>
                       )}
                       {member.joinDate && member.transferredFromTeamName && (
                         <span className="text-emerald-600 font-medium">• เริ่ม {member.joinDate}</span>
@@ -252,7 +252,7 @@ export const CalendarLeave: React.FC<CalendarLeaveProps> = ({
                     const leaveConfig = l ? LEAVE_TYPES.find(t => t.id === l.type) : null;
 
                     const isNotYetJoined = Boolean(member.joinDate && dStr < member.joinDate);
-                    const isResigned = Boolean(member.resignDate && dStr >= member.resignDate);
+                    const isResigned = Boolean(member.resignDate && dStr > member.resignDate);
                     const isInactive = isNotYetJoined || isResigned;
 
                     // Tooltip text explaining reason
@@ -262,8 +262,8 @@ export const CalendarLeave: React.FC<CalendarLeaveProps> = ({
                           : `ยังไม่เริ่มงานในสังกัด ${member.teamName} (เริ่มงานวันที่ ${formatDateTH(member.joinDate)}) - ซ่อนไม่ให้ลงข้อมูลซ้ำ`)
                       : isResigned
                       ? (member.transferredToTeamName
-                          ? `ย้ายไปสังกัด ${member.transferredToTeamName} แล้ว (ตั้งแต่วันที่ ${formatDateTH(member.resignDate)}) - ซ่อนไม่ให้ลงข้อมูลซ้ำ`
-                          : `ย้าย/ออกจากสังกัด ${member.teamName} แล้ว (ตั้งแต่วันที่ ${formatDateTH(member.resignDate)}) - ซ่อนไม่ให้ลงข้อมูลซ้ำ`)
+                          ? `ย้ายไปสังกัด ${member.transferredToTeamName} แล้ว (ทำงานวันสุดท้ายที่นี่เมื่อ ${formatDateTH(member.resignDate)}) - สิ้นสุดสังกัดเดิมแล้ว`
+                          : `สิ้นสุดการทำงานในสังกัด ${member.teamName} แล้ว (ทำงานวันสุดท้ายเมื่อ ${formatDateTH(member.resignDate)})`)
                       : '';
 
                     if (isInactive) {

@@ -15,7 +15,7 @@ import {
   INITIAL_TEAMS, getInitialJobs, getInitialLeaves, getInitialHolidays 
 } from './data/initialData';
 
-import { calculateIncentives, getEffectiveRulesForPeriod, calculateSingleJobIncentive, formatDateTH } from './utils/calculator';
+import { calculateIncentives, getEffectiveRulesForPeriod, calculateSingleJobIncentive, formatDateTH, addDays } from './utils/calculator';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { JobManagement } from './components/JobManagement';
@@ -893,164 +893,242 @@ export default function App() {
   };
 
   const handleUpdateMember = (teamId: string, memberId: string, data: Partial<TeamMember>) => {
-    const sourceTeam = teams.find(t => t.id === teamId);
-    const currentMember = sourceTeam?.members?.find(m => m.id === memberId);
-    if (!currentMember) return;
+    setTeams(prevTeams => {
+      const sourceTeam = prevTeams.find(t => t.id === teamId);
+      const currentMember = sourceTeam?.members?.find(m => m.id === memberId);
+      if (!currentMember) return prevTeams;
 
-    let syncedTargetTeamName: string | null = null;
-    let syncedDate: string | null = null;
-    let syncType: 'departure_to_join' | 'join_to_departure' | null = null;
+      let syncedTargetTeamName: string | null = null;
+      let syncedDate: string | null = null;
+      let syncType: 'departure_to_join' | 'join_to_departure' | null = null;
 
-    // Check if resignDate changed
-    const resignDateChanged = data.resignDate !== undefined && data.resignDate !== currentMember.resignDate;
-    // Check if joinDate changed
-    const joinDateChanged = data.joinDate !== undefined && data.joinDate !== currentMember.joinDate;
-    // Check if name changed
-    const nameChanged = data.name !== undefined && data.name.trim() !== currentMember.name.trim();
+      // Check if resignDate changed
+      const resignDateChanged = data.resignDate !== undefined && data.resignDate !== currentMember.resignDate;
+      // Check if joinDate changed
+      const joinDateChanged = data.joinDate !== undefined && data.joinDate !== currentMember.joinDate;
+      // Check if name changed
+      const nameChanged = data.name !== undefined && data.name.trim() !== currentMember.name.trim();
 
-    // Find linked counterpart in other teams
-    let linkedTeamId: string | null = null;
-    let linkedMemberId: string | null = null;
+      // Find linked counterpart in other teams
+      let linkedTeamId: string | null = null;
+      let linkedMemberId: string | null = null;
+      let isSourceOldTeam = false;
 
-    // Priority 1: Check explicit IDs
-    if (currentMember.transferredToId) {
-      for (const t of teams) {
-        if (t.id === teamId) continue;
-        const found = (t.members || []).find(m => m.id === currentMember.transferredToId);
-        if (found) {
-          linkedTeamId = t.id;
-          linkedMemberId = found.id;
-          break;
+      // Priority 1: Check explicit IDs
+      if (currentMember.transferredToId) {
+        for (const t of prevTeams) {
+          if (t.id === teamId) continue;
+          const found = (t.members || []).find(m => m.id === currentMember.transferredToId);
+          if (found) {
+            linkedTeamId = t.id;
+            linkedMemberId = found.id;
+            isSourceOldTeam = true;
+            break;
+          }
+        }
+      } else if (currentMember.transferredFromId) {
+        for (const t of prevTeams) {
+          if (t.id === teamId) continue;
+          const found = (t.members || []).find(m => m.id === currentMember.transferredFromId);
+          if (found) {
+            linkedTeamId = t.id;
+            linkedMemberId = found.id;
+            isSourceOldTeam = false;
+            break;
+          }
         }
       }
-    } else if (currentMember.transferredFromId) {
-      for (const t of teams) {
-        if (t.id === teamId) continue;
-        const found = (t.members || []).find(m => m.id === currentMember.transferredFromId);
-        if (found) {
-          linkedTeamId = t.id;
-          linkedMemberId = found.id;
-          break;
+
+      // Priority 2: Fallback lookup by matching name
+      if (!linkedMemberId) {
+        const cleanName = currentMember.name.trim().toLowerCase();
+        for (const t of prevTeams) {
+          if (t.id === teamId) continue;
+          const match = (t.members || []).find(m => m.name.trim().toLowerCase() === cleanName);
+          if (match) {
+            linkedTeamId = t.id;
+            linkedMemberId = match.id;
+            if (currentMember.resignDate && !match.resignDate) {
+              isSourceOldTeam = true;
+            } else if (!currentMember.resignDate && match.resignDate) {
+              isSourceOldTeam = false;
+            } else if (currentMember.joinDate && match.joinDate && currentMember.joinDate < match.joinDate) {
+              isSourceOldTeam = true;
+            } else {
+              isSourceOldTeam = false;
+            }
+            break;
+          }
         }
       }
-    }
 
-    // Priority 2: Fallback lookup by matching name & dates if explicit ID was not yet stored
-    if (!linkedMemberId) {
-      const cleanName = currentMember.name.trim().toLowerCase();
-      for (const t of teams) {
-        if (t.id === teamId) continue;
-        const match = (t.members || []).find(m => {
-          if (m.name.trim().toLowerCase() !== cleanName) return false;
-          if (m.transferredFromId === currentMember.id || m.transferredToId === currentMember.id) return true;
-          if (currentMember.resignDate && m.joinDate === currentMember.resignDate) return true;
-          if (m.resignDate && currentMember.joinDate === m.resignDate) return true;
-          return true; // Match by identical name in another team
-        });
-        if (match) {
-          linkedTeamId = t.id;
-          linkedMemberId = match.id;
-          break;
+      const nextTeams = prevTeams.map(t => {
+        // 1. Update member in source team
+        if (t.id === teamId) {
+          return {
+            ...t,
+            members: (t.members || []).map(m => {
+              if (m.id !== memberId) return m;
+              const updated = { ...m, ...data };
+              if (linkedTeamId && linkedMemberId) {
+                const targetT = prevTeams.find(x => x.id === linkedTeamId);
+                if (isSourceOldTeam && !m.transferredToId) {
+                  updated.transferredToId = linkedMemberId;
+                  updated.transferredToTeamName = targetT?.name;
+                } else if (!isSourceOldTeam && !m.transferredFromId) {
+                  updated.transferredFromId = linkedMemberId;
+                  updated.transferredFromTeamName = targetT?.name;
+                }
+              }
+              return updated;
+            })
+          };
         }
+
+        // 2. If this team contains the linked counterpart, synchronize!
+        if (linkedTeamId && t.id === linkedTeamId && linkedMemberId) {
+          return {
+            ...t,
+            members: (t.members || []).map(m => {
+              if (m.id !== linkedMemberId) return m;
+              const updated = { ...m };
+
+              // If name was updated, keep name in sync
+              if (nameChanged && data.name) {
+                updated.name = data.name.trim();
+              }
+
+              // Business rule:
+              // - วันสิ้นสุดทีมเก่าคือวันสุดท้ายที่ทำงานของทีมเก่า
+              // - วันเริ่มต้นทีมใหม่คือวันเริ่มทำงานของทีมใหม่ (+1 วันถัดไป)
+              if (isSourceOldTeam) {
+                // Source is old team. User updated resignDate (วันสุดท้ายที่ทำงานทีมเก่า)
+                if (resignDateChanged && data.resignDate) {
+                  const autoNewJoin = addDays(data.resignDate, 1);
+                  updated.joinDate = autoNewJoin;
+                  syncedTargetTeamName = t.name;
+                  syncedDate = autoNewJoin;
+                  syncType = 'departure_to_join';
+                }
+                if (!updated.transferredFromId) {
+                  updated.transferredFromId = memberId;
+                  updated.transferredFromTeamName = sourceTeam?.name;
+                }
+              } else {
+                // Source is new team. User updated joinDate (วันเริ่มทำงานทีมใหม่)
+                if (joinDateChanged && data.joinDate) {
+                  const autoOldResign = addDays(data.joinDate, -1);
+                  updated.resignDate = autoOldResign;
+                  syncedTargetTeamName = t.name;
+                  syncedDate = autoOldResign;
+                  syncType = 'join_to_departure';
+                }
+                if (!updated.transferredToId) {
+                  updated.transferredToId = memberId;
+                  updated.transferredToTeamName = sourceTeam?.name;
+                }
+              }
+
+              return updated;
+            })
+          };
+        }
+
+        return t;
+      });
+
+      localStorage.setItem(`${APP_KEY_PREFIX}teams`, JSON.stringify(nextTeams));
+      saveToRealtimeDb({ teams: nextTeams });
+
+      if (syncType === 'departure_to_join' && syncedTargetTeamName && syncedDate) {
+        showNotification(
+          `อัปเดตข้อมูลช่างสำเร็จ และซิงค์วันเริ่มงานที่ทีมใหม่ (${syncedTargetTeamName}: ${formatDateTH(syncedDate)}) แล้ว`,
+          'success'
+        );
+      } else if (syncType === 'join_to_departure' && syncedTargetTeamName && syncedDate) {
+        showNotification(
+          `อัปเดตข้อมูลช่างสำเร็จ และซิงค์วันสุดท้ายที่ทำงานทีมเดิม (${syncedTargetTeamName}: ${formatDateTH(syncedDate)}) แล้ว`,
+          'success'
+        );
+      } else {
+        showNotification('อัปเดตข้อมูลช่างสำเร็จ', 'success');
       }
-    }
 
-    const nextTeams = teams.map(t => {
-      // 1. Update member in source team
-      if (t.id === teamId) {
-        return {
-          ...t,
-          members: (t.members || []).map(m => {
-            if (m.id !== memberId) return m;
-            const updated = { ...m, ...data };
-            if (linkedTeamId && linkedMemberId) {
-              const targetT = teams.find(x => x.id === linkedTeamId);
-              if (resignDateChanged && !m.transferredToId) {
-                updated.transferredToId = linkedMemberId;
-                updated.transferredToTeamName = targetT?.name;
-              } else if (joinDateChanged && !m.transferredFromId) {
-                updated.transferredFromId = linkedMemberId;
-                updated.transferredFromTeamName = targetT?.name;
-              }
-            }
-            return updated;
-          })
-        };
-      }
-
-      // 2. If this team contains the linked counterpart, synchronize!
-      if (linkedTeamId && t.id === linkedTeamId && linkedMemberId) {
-        return {
-          ...t,
-          members: (t.members || []).map(m => {
-            if (m.id !== linkedMemberId) return m;
-            const updated = { ...m };
-
-            // If name was updated, keep name in sync
-            if (nameChanged && data.name) {
-              updated.name = data.name.trim();
-            }
-
-            // User edited resignDate in old team -> sync joinDate in new team!
-            if (resignDateChanged) {
-              if (data.resignDate) {
-                updated.joinDate = data.resignDate;
-                syncedTargetTeamName = t.name;
-                syncedDate = data.resignDate;
-                syncType = 'departure_to_join';
-              }
-              if (!updated.transferredFromId) {
-                updated.transferredFromId = memberId;
-                updated.transferredFromTeamName = sourceTeam?.name;
-              }
-            }
-            // User edited joinDate in new team -> sync resignDate in old team!
-            else if (joinDateChanged) {
-              if (data.joinDate) {
-                updated.resignDate = data.joinDate;
-                syncedTargetTeamName = t.name;
-                syncedDate = data.joinDate;
-                syncType = 'join_to_departure';
-              }
-              if (!updated.transferredToId) {
-                updated.transferredToId = memberId;
-                updated.transferredToTeamName = sourceTeam?.name;
-              }
-            }
-
-            return updated;
-          })
-        };
-      }
-
-      return t;
+      return nextTeams;
     });
+  };
 
-    setTeams(nextTeams);
-    saveToRealtimeDb({ teams: nextTeams });
+  /**
+   * Dedicated atomic sync function to align transfer dates between old and new teams in 1 step:
+   * - วันสิ้นสุดทีมเก่าคือวันสุดท้ายที่ทำงานของทีมเก่า
+   * - วันเริ่มต้นทีมใหม่คือวันเริ่มทำงานของทีมใหม่
+   */
+  const handleSyncTransferDates = (
+    oldTeamId: string,
+    oldMemberId: string,
+    newTeamId: string,
+    newMemberId: string,
+    lastWorkingDayOldTeam: string,
+    firstWorkingDayNewTeam: string
+  ) => {
+    setTeams(prevTeams => {
+      const oldTeam = prevTeams.find(t => t.id === oldTeamId);
+      const newTeam = prevTeams.find(t => t.id === newTeamId);
 
-    if (syncType === 'departure_to_join' && syncedTargetTeamName && syncedDate) {
+      const nextTeams = prevTeams.map(t => {
+        if (t.id === oldTeamId) {
+          return {
+            ...t,
+            members: (t.members || []).map(m => {
+              if (m.id !== oldMemberId) return m;
+              return {
+                ...m,
+                resignDate: lastWorkingDayOldTeam,
+                transferredToId: newMemberId,
+                transferredToTeamName: newTeam?.name || m.transferredToTeamName
+              };
+            })
+          };
+        }
+        if (t.id === newTeamId) {
+          return {
+            ...t,
+            members: (t.members || []).map(m => {
+              if (m.id !== newMemberId) return m;
+              return {
+                ...m,
+                joinDate: firstWorkingDayNewTeam,
+                transferredFromId: oldMemberId,
+                transferredFromTeamName: oldTeam?.name || m.transferredFromTeamName
+              };
+            })
+          };
+        }
+        return t;
+      });
+
+      localStorage.setItem(`${APP_KEY_PREFIX}teams`, JSON.stringify(nextTeams));
+      saveToRealtimeDb({ teams: nextTeams });
+
       showNotification(
-        `อัปเดตข้อมูลช่างสำเร็จ และซิงค์วันเริ่มงานที่ทีมใหม่ (${syncedTargetTeamName}: ${syncedDate}) แล้ว`,
+        `ซิงค์ข้อมูลอัตโนมัติสำเร็จ: ทีมเก่าทำงานวันสุดท้าย ${formatDateTH(lastWorkingDayOldTeam)} • ทีมใหม่เริ่มงาน ${formatDateTH(firstWorkingDayNewTeam)}`,
         'success'
       );
-    } else if (syncType === 'join_to_departure' && syncedTargetTeamName && syncedDate) {
-      showNotification(
-        `อัปเดตข้อมูลช่างสำเร็จ และซิงค์วันที่ออกจากทีมเดิม (${syncedTargetTeamName}: ${syncedDate}) แล้ว`,
-        'success'
-      );
-    } else {
-      showNotification('อัปเดตข้อมูลช่างสำเร็จ', 'success');
-    }
+
+      return nextTeams;
+    });
   };
 
   const handleDeleteMember = (teamId: string, memberId: string) => {
     requestConfirm('ลบช่างออกจากทีม', 'ยืนยันลบสมาชิกท่านนี้?', () => {
-      const nextTeams = teams.map(t =>
-        t.id === teamId ? { ...t, members: (t.members || []).filter(m => m.id !== memberId) } : t
-      );
-      setTeams(nextTeams);
-      saveToRealtimeDb({ teams: nextTeams });
+      setTeams(prevTeams => {
+        const nextTeams = prevTeams.map(t =>
+          t.id === teamId ? { ...t, members: (t.members || []).filter(m => m.id !== memberId) } : t
+        );
+        localStorage.setItem(`${APP_KEY_PREFIX}teams`, JSON.stringify(nextTeams));
+        saveToRealtimeDb({ teams: nextTeams });
+        return nextTeams;
+      });
       setConfirmModal(null);
       showNotification('ลบช่างเรียบร้อยแล้ว');
     });
@@ -1063,51 +1141,56 @@ export default function App() {
     departureDate: string,
     newTeamJoinDate?: string
   ) => {
-    const sourceTeam = teams.find(t => t.id === sourceTeamId);
-    const targetTeam = teams.find(t => t.id === targetTeamId);
+    setTeams(prevTeams => {
+      const sourceTeam = prevTeams.find(t => t.id === sourceTeamId);
+      const targetTeam = prevTeams.find(t => t.id === targetTeamId);
 
-    if (!sourceTeam || !targetTeam) return;
+      if (!sourceTeam || !targetTeam) return prevTeams;
 
-    const actualJoinDate = newTeamJoinDate || departureDate;
-    const newMemberId = `m-${Date.now()}`;
+      // Default: new team start date is the day right after departureDate (last working day)
+      const actualJoinDate = newTeamJoinDate || (departureDate ? addDays(departureDate, 1) : departureDate);
+      const newMemberId = `m-${Date.now()}`;
 
-    // Set resign date and target link for source team record
-    const updatedSourceMembers = (sourceTeam.members || []).map(m =>
-      m.id === member.id
-        ? {
-            ...m,
-            resignDate: departureDate,
-            transferredToId: newMemberId,
-            transferredToTeamName: targetTeam.name
-          }
-        : m
-    );
+      // Set resign date and target link for source team record
+      const updatedSourceMembers = (sourceTeam.members || []).map(m =>
+        m.id === member.id
+          ? {
+              ...m,
+              resignDate: departureDate,
+              transferredToId: newMemberId,
+              transferredToTeamName: targetTeam.name
+            }
+          : m
+      );
 
-    // Create new record in target team with join date and source link
-    const newTargetRecord: TeamMember = {
-      id: newMemberId,
-      name: member?.name || '',
-      joinDate: actualJoinDate,
-      resignDate: undefined,
-      transferredFromId: member.id,
-      transferredFromTeamName: sourceTeam.name
-    };
+      // Create new record in target team with join date and source link
+      const newTargetRecord: TeamMember = {
+        id: newMemberId,
+        name: member?.name || '',
+        joinDate: actualJoinDate,
+        resignDate: undefined,
+        transferredFromId: member.id,
+        transferredFromTeamName: sourceTeam.name
+      };
 
-    const updatedTargetMembers = [...(targetTeam.members || []), newTargetRecord];
+      const updatedTargetMembers = [...(targetTeam.members || []), newTargetRecord];
 
-    const nextTeams = teams.map(t => {
-      if (t.id === sourceTeamId) return { ...t, members: updatedSourceMembers };
-      if (t.id === targetTeamId) return { ...t, members: updatedTargetMembers };
-      return t;
+      const nextTeams = prevTeams.map(t => {
+        if (t.id === sourceTeamId) return { ...t, members: updatedSourceMembers };
+        if (t.id === targetTeamId) return { ...t, members: updatedTargetMembers };
+        return t;
+      });
+
+      localStorage.setItem(`${APP_KEY_PREFIX}teams`, JSON.stringify(nextTeams));
+      saveToRealtimeDb({ teams: nextTeams });
+
+      showNotification(
+        `ย้ายช่าง ${member?.name || ''} ไปยัง ${targetTeam?.name || ''} เรียบร้อย (ทีมเดิมทำงานวันสุดท้าย: ${formatDateTH(departureDate)} • ทีมใหม่เริ่มงาน: ${formatDateTH(actualJoinDate)})`,
+        'success'
+      );
+
+      return nextTeams;
     });
-
-    setTeams(nextTeams);
-    saveToRealtimeDb({ teams: nextTeams });
-
-    showNotification(
-      `ย้ายช่าง ${member?.name || ''} ไปยัง ${targetTeam?.name || ''} เรียบร้อย (ออกจาก ${sourceTeam.name}: ${departureDate} • เริ่มงาน ${targetTeam.name}: ${actualJoinDate})`,
-      'success'
-    );
   };
 
   const handleResetTeamsToDefault = () => {
@@ -1823,6 +1906,7 @@ export default function App() {
             onUpdateMember={handleUpdateMember}
             onDeleteMember={handleDeleteMember}
             onTransferMember={handleTransferMember}
+            onSyncTransferDates={handleSyncTransferDates}
             onResetTeamsToDefault={handleResetTeamsToDefault}
             themeColor={themeColor}
             themeTextColor={themeTextColor}

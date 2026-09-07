@@ -139,6 +139,24 @@ export const getDaysArray = (startStr: string, endStr: string): string[] => {
 };
 
 /**
+ * Add or subtract days from a YYYY-MM-DD date string
+ */
+export const addDays = (dateStr: string, days: number): string => {
+  if (!dateStr) return '';
+  try {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() + days);
+    const nextY = dt.getFullYear();
+    const nextM = String(dt.getMonth() + 1).padStart(2, '0');
+    const nextD = String(dt.getDate()).padStart(2, '0');
+    return `${nextY}-${nextM}-${nextD}`;
+  } catch (e) {
+    return dateStr;
+  }
+};
+
+/**
  * Resolves the effective incentive rules for a given pay period.
  * Supports rule versioning so historical periods retain their original formulas
  * while newer periods use updated formulas automatically.
@@ -257,7 +275,7 @@ export function calculateSingleJobIncentive(
     if (!memberRecord) return false;
 
     const isJoined = !memberRecord.joinDate || !jobDate || memberRecord.joinDate <= jobDate;
-    const isResigned = memberRecord.resignDate && jobDate && jobDate >= memberRecord.resignDate;
+    const isResigned = memberRecord.resignDate && jobDate && jobDate > memberRecord.resignDate;
     return isJoined && !isResigned;
   });
 
@@ -422,7 +440,7 @@ export function calculateIncentives(
       if (!memberRecord) return false;
 
       const isJoined = !memberRecord.joinDate || memberRecord.joinDate <= job.date;
-      const isResigned = memberRecord.resignDate && job.date >= memberRecord.resignDate;
+      const isResigned = memberRecord.resignDate && job.date > memberRecord.resignDate;
       return isJoined && !isResigned;
     });
 
@@ -604,7 +622,7 @@ export function calculateIncentives(
           }
           if (!memberRecord) return false;
           const isJoined = !memberRecord.joinDate || memberRecord.joinDate <= job.date;
-          const isResigned = memberRecord.resignDate && job.date >= memberRecord.resignDate;
+          const isResigned = memberRecord.resignDate && job.date > memberRecord.resignDate;
           return isJoined && !isResigned;
         });
 
@@ -658,8 +676,8 @@ export function calculateIncentives(
             isChecked: job.isChecked
           });
 
-          // Compute individual head share
-          const activeMembers = membersList.filter(m => (!m.joinDate || m.joinDate <= day) && (!m.resignDate || m.resignDate > day));
+          // Compute individual head share (technician active if day <= resignDate)
+          const activeMembers = membersList.filter(m => (!m.joinDate || m.joinDate <= day) && (!m.resignDate || day <= m.resignDate));
 
           const eligibleMembers = activeMembers.filter(m => {
             const leave = safeLeaves.find(l => l && l.techId === m.id && l.date === day);
@@ -729,7 +747,7 @@ export function calculateIncentives(
         const dailyPot = dayStats.amount || 0;
         if (dailyPot > 0) {
           teamTotalEarned += dailyPot;
-          const activeMembers = membersList.filter(m => (!m.joinDate || m.joinDate <= day) && (!m.resignDate || m.resignDate > day));
+          const activeMembers = membersList.filter(m => (!m.joinDate || m.joinDate <= day) && (!m.resignDate || day <= m.resignDate));
           const eligibleMembers = activeMembers.filter(m => {
             const leave = safeLeaves.find(l => l && l.techId === m.id && l.date === day);
             return !leave || leave.type === 'vacation';
@@ -757,7 +775,7 @@ export function calculateIncentives(
         workDays: daysInPeriod.filter(d =>
           !safeHolidays.includes(d) &&
           (!m.joinDate || m.joinDate <= d) &&
-          (!m.resignDate || m.resignDate > d) &&
+          (!m.resignDate || d <= m.resignDate) &&
           !safeLeaves.find(l => l && l.techId === m.id && l.date === d && l.type !== 'no_inc')
         ).length,
         leaves: memberLeavesList[m.id] || []
