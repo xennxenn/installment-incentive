@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  Users, Plus, Trash2, Pencil, ArrowRightLeft, X, Check, UserPlus
+  Users, Plus, Trash2, Pencil, ArrowRightLeft, X, Check, UserPlus, Calendar, ArrowRight
 } from 'lucide-react';
 import { Team, TeamMember } from '../types';
 
@@ -11,7 +11,13 @@ interface TeamManagementProps {
   onAddMember: (teamId: string, member: Omit<TeamMember, 'id'>) => void;
   onUpdateMember: (teamId: string, memberId: string, data: Partial<TeamMember>) => void;
   onDeleteMember: (teamId: string, memberId: string) => void;
-  onTransferMember: (sourceTeamId: string, member: TeamMember, targetTeamId: string, effectiveDate: string) => void;
+  onTransferMember: (
+    sourceTeamId: string,
+    member: TeamMember,
+    targetTeamId: string,
+    departureDate: string,
+    newTeamJoinDate?: string
+  ) => void;
   onResetTeamsToDefault?: () => void;
   themeColor: string;
   themeTextColor: string;
@@ -49,8 +55,58 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
     teamId: string;
     member: TeamMember;
     targetTeamId: string;
-    effectiveDate: string;
+    departureDate: string;
+    newTeamJoinDate: string;
   } | null>(null);
+
+  // Helper to identify if a member was transferred to/from another team
+  const getLinkedInfo = (member: TeamMember, currentTeamId: string) => {
+    if (member.transferredToTeamName || member.transferredToId) {
+      return {
+        type: 'transferred_out' as const,
+        teamName: member.transferredToTeamName || 'ทีมใหม่',
+        memberId: member.transferredToId
+      };
+    }
+    if (member.transferredFromTeamName || member.transferredFromId) {
+      return {
+        type: 'transferred_in' as const,
+        teamName: member.transferredFromTeamName || 'ทีมเดิม',
+        memberId: member.transferredFromId
+      };
+    }
+    // Heuristic fallback for previously existing data
+    if (member.resignDate) {
+      for (const t of teams) {
+        if (t.id === currentTeamId) continue;
+        const match = (t.members || []).find(
+          m => m.name.trim().toLowerCase() === member.name.trim().toLowerCase() && !m.resignDate
+        );
+        if (match) {
+          return {
+            type: 'transferred_out' as const,
+            teamName: t.name,
+            memberId: match.id
+          };
+        }
+      }
+    } else {
+      for (const t of teams) {
+        if (t.id === currentTeamId) continue;
+        const match = (t.members || []).find(
+          m => m.name.trim().toLowerCase() === member.name.trim().toLowerCase() && m.resignDate
+        );
+        if (match) {
+          return {
+            type: 'transferred_in' as const,
+            teamName: t.name,
+            memberId: match.id
+          };
+        }
+      }
+    }
+    return null;
+  };
 
   const handleCreateTeam = () => {
     if (newTeamName.trim()) {
@@ -84,15 +140,32 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
   };
 
   const handleConfirmTransfer = () => {
-    if (transferringMember && transferringMember.targetTeamId && transferringMember.effectiveDate) {
+    if (
+      transferringMember &&
+      transferringMember.targetTeamId &&
+      transferringMember.departureDate &&
+      transferringMember.newTeamJoinDate
+    ) {
       onTransferMember(
         transferringMember.teamId,
         transferringMember.member,
         transferringMember.targetTeamId,
-        transferringMember.effectiveDate
+        transferringMember.departureDate,
+        transferringMember.newTeamJoinDate
       );
       setTransferringMember(null);
     }
+  };
+
+  const handleDepartureDateChange = (val: string) => {
+    setTransferringMember(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        departureDate: val,
+        newTeamJoinDate: val // By default, keep start date at new team in sync with departure date
+      };
+    });
   };
 
   return (
@@ -158,6 +231,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                   const isEditingThis =
                     editingMember?.memberId === member.id &&
                     editingMember?.teamId === team.id;
+                  const linked = getLinkedInfo(member, team.id);
 
                   return (
                     <li
@@ -166,16 +240,23 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                     >
                       {/* Transfer view */}
                       {isTransferringThis ? (
-                        <div className="space-y-2 bg-blue-50/80 p-2.5 rounded-lg border border-blue-200">
-                          <div className="font-bold text-blue-900 flex items-center gap-1.5 text-xs">
-                            <ArrowRightLeft size={14} />
-                            <span>ย้ายช่าง {member?.name || ''} ไปทีมใหม่</span>
+                        <div className="space-y-3 bg-gradient-to-br from-blue-50 to-indigo-50/80 p-3 rounded-xl border border-blue-200 shadow-xs">
+                          <div className="flex items-center justify-between border-b border-blue-200/70 pb-2">
+                            <div className="font-bold text-blue-900 flex items-center gap-1.5 text-xs">
+                              <ArrowRightLeft size={15} className="text-blue-600" />
+                              <span>ย้ายช่าง: <span className="underline decoration-blue-400 font-bold">{member?.name || ''}</span></span>
+                            </div>
+                            <span className="text-[10px] font-semibold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-md">
+                              ทีมเดิม: {team.name}
+                            </span>
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-bold text-gray-500 mb-0.5">เลือกทีมปลายทาง:</label>
+                            <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                              เลือกทีมใหม่ (ปลายทาง): <span className="text-red-500">*</span>
+                            </label>
                             <select
-                              className="w-full border rounded-lg p-1.5 text-xs bg-white font-medium"
+                              className="w-full border border-blue-300 rounded-lg p-1.5 text-xs bg-white font-medium focus:ring-2 focus:ring-blue-400"
                               value={transferringMember.targetTeamId}
                               onChange={e =>
                                 setTransferringMember({
@@ -184,7 +265,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                                 })
                               }
                             >
-                              <option value="">-- เลือกทีมปลายทาง --</option>
+                              <option value="">-- กรุณาเลือกทีมใหม่ที่จะย้ายไป --</option>
                               {(teams || [])
                                 .filter(t => t && t.id !== team.id)
                                 .map(t => (
@@ -195,31 +276,76 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                             </select>
                           </div>
 
-                          <div>
-                            <label className="block text-[10px] font-bold text-gray-500 mb-0.5">วันที่มีผลย้าย:</label>
-                            <input
-                              type="date"
-                              className="w-full border rounded-lg p-1 text-xs bg-white"
-                              value={transferringMember.effectiveDate}
-                              onChange={e =>
-                                setTransferringMember({
-                                  ...transferringMember,
-                                  effectiveDate: e.target.value
-                                })
-                              }
-                            />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white/90 p-2.5 rounded-lg border border-blue-100">
+                            <div>
+                              <label className="block text-[10px] font-bold text-red-700 mb-0.5 flex items-center gap-1">
+                                <Calendar size={11} />
+                                <span>วันที่ออกจากทีมเก่า ({team.name}):</span>
+                              </label>
+                              <input
+                                type="date"
+                                className="w-full border border-red-200 rounded-lg p-1.5 text-xs bg-white focus:ring-1 focus:ring-red-400 font-semibold text-gray-800"
+                                value={transferringMember.departureDate}
+                                onChange={e => handleDepartureDateChange(e.target.value)}
+                              />
+                              <span className="text-[9px] text-gray-500 mt-0.5 block leading-tight">
+                                สิ้นสุดการคิดงานในทีมเดิม ณ วันนี้
+                              </span>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-emerald-700 mb-0.5 flex items-center gap-1">
+                                <Calendar size={11} />
+                                <span>วันที่เริ่มงานสำหรับทีมใหม่:</span>
+                              </label>
+                              <input
+                                type="date"
+                                className="w-full border border-emerald-200 rounded-lg p-1.5 text-xs bg-white focus:ring-1 focus:ring-emerald-400 font-semibold text-gray-800"
+                                value={transferringMember.newTeamJoinDate}
+                                onChange={e =>
+                                  setTransferringMember({
+                                    ...transferringMember,
+                                    newTeamJoinDate: e.target.value
+                                  })
+                                }
+                              />
+                              <span className="text-[9px] text-emerald-600 mt-0.5 block leading-tight font-medium">
+                                ✓ ซิงค์ตรงกับวันย้าย (เริ่มคิดงานทีมใหม่)
+                              </span>
+                            </div>
                           </div>
+
+                          {/* Preview Summary */}
+                          {transferringMember.targetTeamId && (
+                            <div className="p-2 rounded-lg bg-blue-100/70 border border-blue-200 text-[11px] text-blue-900 space-y-1">
+                              <div className="font-bold flex items-center gap-1 text-[10px] uppercase text-blue-800">
+                                <span>📋 สรุปผลการย้ายทีม:</span>
+                              </div>
+                              <div className="flex flex-col gap-0.5 text-[10px]">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-red-700 font-bold">• ทีมเดิม ({team.name}):</span>
+                                  <span>ออกจากทีมวันที่ <b className="text-red-700">{transferringMember.departureDate}</b></span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-emerald-700 font-bold">• ทีมใหม่ ({teams.find(t => t.id === transferringMember.targetTeamId)?.name || 'ทีมปลายทาง'}):</span>
+                                  <span>เริ่มงานวันที่ <b className="text-emerald-700">{transferringMember.newTeamJoinDate}</b></span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
                           <div className="flex gap-2 pt-1">
                             <button
                               onClick={handleConfirmTransfer}
-                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-1 rounded-lg font-bold text-xs shadow-xs"
+                              disabled={!transferringMember.targetTeamId || !transferringMember.departureDate || !transferringMember.newTeamJoinDate}
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-1.5 rounded-lg font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-1.5"
                             >
-                              ยืนยันย้าย
+                              <Check size={14} />
+                              <span>ยืนยันย้ายช่าง</span>
                             </button>
                             <button
                               onClick={() => setTransferringMember(null)}
-                              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-1 rounded-lg text-xs"
+                              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-1.5 rounded-lg text-xs font-semibold transition-colors"
                             >
                               ยกเลิก
                             </button>
@@ -227,9 +353,24 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                         </div>
                       ) : isEditingThis ? (
                         /* Edit view */
-                        <div className="space-y-2">
+                        <div className="space-y-2.5 bg-amber-50/70 p-2.5 rounded-xl border border-amber-200">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[11px] font-bold text-gray-800">
+                              แก้ไขข้อมูลช่าง: <span className="text-amber-800">{member.name}</span>
+                            </span>
+                            {linked && (
+                              <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200 flex items-center gap-1">
+                                <ArrowRightLeft size={10} />
+                                {linked.type === 'transferred_out'
+                                  ? `ย้ายไปทีม ${linked.teamName}`
+                                  : `ย้ายมาจากทีม ${linked.teamName}`}
+                              </span>
+                            )}
+                          </div>
+
                           <input
-                            className="w-full border rounded-lg p-1.5 font-bold text-xs bg-white"
+                            className="w-full border rounded-lg p-1.5 font-bold text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            placeholder="ชื่อช่างติดตั้ง"
                             value={editingMember.data?.name || ''}
                             onChange={e =>
                               setEditingMember({
@@ -240,10 +381,12 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                           />
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <span className="text-[10px] font-bold text-gray-400 block">วันเริ่มงาน:</span>
+                              <span className="text-[10px] font-bold text-gray-600 block">
+                                {linked?.type === 'transferred_in' ? 'วันเริ่มงาน (ทีมนี้):' : 'วันเริ่มงาน:'}
+                              </span>
                               <input
                                 type="date"
-                                className="w-full border rounded-lg p-1 text-xs bg-white"
+                                className="w-full border rounded-lg p-1 text-xs bg-white font-medium"
                                 value={editingMember.data.joinDate}
                                 onChange={e =>
                                   setEditingMember({
@@ -252,12 +395,19 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                                   })
                                 }
                               />
+                              {linked?.type === 'transferred_in' && (
+                                <span className="text-[9px] text-blue-600 block mt-0.5 font-medium leading-tight">
+                                  🔄 ซิงค์กับวันออกจาก {linked.teamName}
+                                </span>
+                              )}
                             </div>
                             <div>
-                              <span className="text-[10px] font-bold text-gray-400 block">วันออก/ย้าย:</span>
+                              <span className="text-[10px] font-bold text-gray-600 block">
+                                {linked?.type === 'transferred_out' ? 'วันออกจากทีมนี้:' : 'วันออก/ย้าย:'}
+                              </span>
                               <input
                                 type="date"
-                                className="w-full border rounded-lg p-1 text-xs bg-white"
+                                className="w-full border rounded-lg p-1 text-xs bg-white font-medium"
                                 value={editingMember.data.resignDate}
                                 onChange={e =>
                                   setEditingMember({
@@ -266,19 +416,36 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                                   })
                                 }
                               />
+                              {linked?.type === 'transferred_out' && (
+                                <span className="text-[9px] text-blue-600 block mt-0.5 font-medium leading-tight">
+                                  🔄 ซิงค์กับวันเริ่มงานที่ {linked.teamName}
+                                </span>
+                              )}
                             </div>
                           </div>
+
+                          {linked && (
+                            <div className="text-[10px] text-blue-800 bg-blue-50/90 p-2 rounded-lg border border-blue-200 flex items-start gap-1.5">
+                              <span className="font-bold shrink-0">⚡ ซิงค์อัตโนมัติ:</span>
+                              <span className="leading-tight">
+                                {linked.type === 'transferred_out'
+                                  ? `เมื่อบันทึก วันที่ออกจากทีมนี้จะถูกนำไปอัปเดตเป็นวันเริ่มงานของทีม ${linked.teamName} โดยอัตโนมัติ`
+                                  : `เมื่อบันทึก วันเริ่มงานของทีมนี้จะถูกนำไปอัปเดตเป็นวันที่ออกจากทีมเดิม (${linked.teamName}) โดยอัตโนมัติ`}
+                              </span>
+                            </div>
+                          )}
+
                           <div className="flex gap-2 pt-1">
                             <button
                               onClick={handleSaveMemberEdit}
                               style={{ backgroundColor: themeColor, color: themeTextColor }}
-                              className="flex-1 py-1 rounded-lg font-bold text-xs"
+                              className="flex-1 py-1.5 rounded-lg font-bold text-xs shadow-xs hover:opacity-90 transition-opacity"
                             >
-                              บันทึก
+                              บันทึกข้อมูล
                             </button>
                             <button
                               onClick={() => setEditingMember(null)}
-                              className="flex-1 bg-gray-200 text-gray-700 py-1 rounded-lg text-xs"
+                              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-1.5 rounded-lg text-xs font-semibold transition-colors"
                             >
                               ยกเลิก
                             </button>
@@ -286,33 +453,62 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                         </div>
                       ) : (
                         /* Normal view */
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <div className={`font-bold ${member.resignDate ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
-                              {member?.name || ''}{' '}
-                              {member.resignDate && (
-                                <span className="text-[10px] text-red-500 font-normal no-underline ml-1">
-                                  (ลาออก/ย้ายทีม)
+                        <div className="flex justify-between items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`font-bold ${member.resignDate ? 'text-gray-500' : 'text-gray-900'}`}>
+                                {member?.name || ''}
+                              </span>
+                              {linked?.type === 'transferred_out' && (
+                                <span
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-0.5"
+                                  title={`ย้ายไปสังกัดทีม ${linked.teamName}`}
+                                >
+                                  <ArrowRightLeft size={9} />
+                                  ย้ายไป {linked.teamName}
+                                </span>
+                              )}
+                              {linked?.type === 'transferred_in' && (
+                                <span
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-0.5"
+                                  title={`ย้ายมาจากทีม ${linked.teamName}`}
+                                >
+                                  <ArrowRightLeft size={9} />
+                                  ย้ายมาจาก {linked.teamName}
+                                </span>
+                              )}
+                              {member.resignDate && !linked && (
+                                <span className="text-[9px] text-red-500 font-semibold bg-red-50 px-1.5 py-0.2 rounded border border-red-200">
+                                  ลาออก
                                 </span>
                               )}
                             </div>
-                            <div className="text-[10px] text-gray-400 mt-0.5">
-                              เริ่ม: {member.joinDate || '2024-01-01'}
-                              {member.resignDate ? ` • ออก: ${member.resignDate}` : ''}
+                            <div className="text-[10px] text-gray-500 mt-0.5 flex flex-wrap items-center gap-x-2">
+                              <span>
+                                {linked?.type === 'transferred_in' ? 'วันที่เริ่มงานทีมนี้: ' : 'เริ่ม: '}
+                                <b className="text-gray-700 font-medium">{member.joinDate || '-'}</b>
+                              </span>
+                              {member.resignDate && (
+                                <span className="text-red-600">
+                                  • วันที่ออกจากทีม: <b className="font-semibold">{member.resignDate}</b>
+                                </span>
+                              )}
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 shrink-0">
                             <button
-                              onClick={() =>
+                              onClick={() => {
+                                const today = new Date().toISOString().split('T')[0];
                                 setTransferringMember({
                                   teamId: team.id,
                                   member,
                                   targetTeamId: '',
-                                  effectiveDate: new Date().toISOString().split('T')[0]
-                                })
-                              }
-                              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-white rounded border border-transparent hover:border-gray-200"
+                                  departureDate: today,
+                                  newTeamJoinDate: today
+                                });
+                              }}
+                              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-colors"
                               title="ย้ายทีมช่าง"
                             >
                               <ArrowRightLeft size={13} />
@@ -329,14 +525,14 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                                   }
                                 })
                               }
-                              className="p-1 text-gray-400 hover:text-gray-900 hover:bg-white rounded border border-transparent hover:border-gray-200"
+                              className="p-1 text-gray-400 hover:text-gray-900 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-colors"
                               title="แก้ไขข้อมูล"
                             >
                               <Pencil size={13} />
                             </button>
                             <button
                               onClick={() => onDeleteMember(team.id, member.id)}
-                              className="p-1 text-gray-400 hover:text-red-600 hover:bg-white rounded border border-transparent hover:border-gray-200"
+                              className="p-1 text-gray-400 hover:text-red-600 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-colors"
                               title="ลบช่าง"
                             >
                               <X size={13} />

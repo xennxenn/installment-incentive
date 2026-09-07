@@ -187,8 +187,7 @@ export const INITIAL_TEAMS: Team[] = [
     members: [
       { id: 'm1', name: 'ช่างนาย', joinDate: '2020-01-01' },
       { id: 'm2', name: 'ช่างอาท', joinDate: '2020-01-01' },
-      { id: 'm3', name: 'ช่างลิด', joinDate: '2020-01-01' },
-      { id: 'm11', name: 'ช่างเซฟ', joinDate: '2020-01-01' }
+      { id: 'm3', name: 'ช่างลิด', joinDate: '2020-01-01' }
     ]
   },
   {
@@ -225,11 +224,10 @@ export const INITIAL_TEAMS: Team[] = [
 ];
 
 export function getInitialJobs(currentMonthStr: string): Job[] {
-  // Generate sample jobs for the current month
-  const today = new Date();
-  const y = today.getFullYear();
-  const m = String(today.getMonth() + 1).padStart(2, '0');
-  
+  const parts = (currentMonthStr || '').split('-');
+  const y = parts[0] || '2026';
+  const m = parts[1] || '09';
+
   return [
     {
       id: 'job-101',
@@ -352,9 +350,9 @@ export function getInitialJobs(currentMonthStr: string): Job[] {
 }
 
 export function getInitialLeaves(currentMonthStr: string): LeaveRecord[] {
-  const today = new Date();
-  const y = today.getFullYear();
-  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const parts = (currentMonthStr || '').split('-');
+  const y = parts[0] || '2026';
+  const m = parts[1] || '09';
 
   return [
     { id: 'l-1', techId: 'm3', date: `${y}-${m}-06`, type: 'sick' },
@@ -364,9 +362,9 @@ export function getInitialLeaves(currentMonthStr: string): LeaveRecord[] {
 }
 
 export function getInitialHolidays(currentMonthStr: string): string[] {
-  const today = new Date();
-  const y = today.getFullYear();
-  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const parts = (currentMonthStr || '').split('-');
+  const y = parts[0] || '2026';
+  const m = parts[1] || '09';
 
   return [`${y}-${m}-01`, `${y}-${m}-13`];
 }

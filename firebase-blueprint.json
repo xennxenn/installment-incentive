@@ -22,6 +22,10 @@
     "/curtain_installer/main_state": {
       "schema": { "$ref": "#/entities/MainState" },
       "description": "Master application state for real-time collaboration across all devices"
+    },
+    "/curtain_snapshots/{snapshotId}": {
+      "schema": { "$ref": "#/entities/MainState" },
+      "description": "Historical timestamped point-in-time database snapshots for disaster recovery and automated scheduled backups"
     }
   }
 }

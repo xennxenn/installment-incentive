@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   BarChart3, FileText, Users, Calendar, FileSpreadsheet, Shield, 
-  Printer, LogOut, FolderPlus, X, Pencil, Sparkles, Sliders
+  Printer, LogOut, FolderPlus, X, Pencil, Sparkles, Sliders, Cloud
 } from 'lucide-react';
 import { AppUser, PayPeriod } from '../types';
 import { getAutoPeriodForMonth } from '../utils/periodUtils';
@@ -100,38 +100,39 @@ export const Header: React.FC<HeaderProps> = ({
               <h1 className="font-extrabold text-base md:text-lg text-gray-900 tracking-tight leading-tight">
                 PASAYA - Installment Incentive Calculator
               </h1>
-              <div className="flex items-center gap-3 text-xs text-gray-500">
-                <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200 text-[11px] font-bold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span>Realtime Cloud Sync</span>
+              <div className="flex flex-wrap items-center gap-2.5 text-xs text-gray-500 mt-0.5">
+                <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-200 text-[11px] font-bold shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <Cloud size={12} className="text-emerald-600" />
+                  <span>Cloud Production Database (เชื่อมต่อแบบเรียลไทม์)</span>
                 </div>
                 <span>ผู้ใช้งาน: <strong className="text-gray-700">{currentUser?.name || currentUser?.username || 'ผู้ใช้'}</strong> ({currentUser?.role || 'admin'})</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
             <button
               onClick={onOpenRulesModal}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 transition-colors"
+              className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 transition-colors"
             >
-              <Sliders size={14} className="text-gray-500" />
+              <Sliders size={13} className="text-gray-500" />
               <span>สูตรคำนวณ</span>
             </button>
             <button
               onClick={() => window.print()}
               style={{ backgroundColor: themeColor, color: themeTextColor }}
-              className="px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 hover:opacity-90 text-xs font-semibold shadow-sm transition-all"
+              className="px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:opacity-90 text-xs font-semibold shadow-sm transition-all"
             >
-              <Printer size={14} />
+              <Printer size={13} />
               <span>พิมพ์</span>
             </button>
             <button
               onClick={onLogout}
-              className="px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-red-200 hover:bg-red-50 text-red-600 text-xs font-semibold transition-colors"
+              className="px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 border border-red-200 hover:bg-red-50 text-red-600 text-xs font-semibold transition-colors"
             >
-              <LogOut size={14} />
-              <span>ออกจากระบบ</span>
+              <LogOut size={13} />
+              <span>ออก</span>
             </button>
           </div>
         </div>

@@ -7,7 +7,7 @@ import {
 import { 
   AppUser, Team, TeamMember, Job, LeaveRecord, PayPeriod, 
   IncentiveRules, NotificationState, ConfirmModalState, LeaveTypeId,
-  RuleVersion, PeriodRuleSaveOptions
+  RuleVersion, PeriodRuleSaveOptions, AutoBackupConfig, BackupInterval
 } from './types';
 
 import { 
@@ -15,7 +15,7 @@ import {
   INITIAL_TEAMS, getInitialJobs, getInitialLeaves, getInitialHolidays 
 } from './data/initialData';
 
-import { calculateIncentives, getEffectiveRulesForPeriod, calculateSingleJobIncentive } from './utils/calculator';
+import { calculateIncentives, getEffectiveRulesForPeriod, calculateSingleJobIncentive, formatDateTH } from './utils/calculator';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { JobManagement } from './components/JobManagement';
@@ -25,9 +25,97 @@ import { Reports } from './components/Reports';
 import { AdminSettings } from './components/AdminSettings';
 import { IncentiveRulesModal } from './components/IncentiveRulesModal';
 import { getCurrentAutoPeriod, generateAutoPeriodsList } from './utils/periodUtils';
-import { subscribeToRealtimeData, saveToRealtimeDb } from './utils/firebaseSync';
+import { 
+  subscribeToRealtimeData, 
+  saveToRealtimeDb, 
+  createDatabaseSnapshot, 
+  fetchDatabaseSnapshots, 
+  restoreSnapshotById, 
+  deleteDatabaseSnapshot,
+  exportFullBackupJSON, 
+  parseAndValidateBackupJSON,
+  SnapshotSummary,
+  AppFirebaseData
+} from './utils/firebaseSync';
 
 const APP_KEY_PREFIX = 'curtain_incentive_v2_';
+
+// Auto-correction for jobs that were mistakenly parsed with US date format M/D/YY (e.g. 9/1/26 becoming 2026-01-09 instead of 2026-09-01)
+const sanitizeCorruptedDates = (jobsList: Job[]): { jobs: Job[]; hasChanged: boolean } => {
+  let changed = false;
+  const updated = jobsList.map(j => {
+    if (j.date === '2026-01-09') {
+      const isSuspect =
+        ['2600718/1', '2600799/1', '2600770/1', '2600763/1', '10220089/1'].includes(j.orderNo) ||
+        ['คุณพัชร์ธนัน', 'คุณนุชรินทร์', 'คุณปัน', 'คุณวลัยพรรณ', 'Mr.Chris Cole'].some(name => (j.customer || '').includes(name));
+      if (isSuspect) {
+        changed = true;
+        return { ...j, date: '2026-09-01' };
+      }
+    }
+    return j;
+  });
+  return { jobs: updated, hasChanged: changed };
+};
+
+// Auto-sanitize leaves for transferred technicians: re-routes leaves to active team member ID and deduplicates leaves on the same day
+const sanitizeTransferredLeaves = (
+  leavesList: LeaveRecord[],
+  teamsList: Team[]
+): { leaves: LeaveRecord[]; hasChanged: boolean } => {
+  let changed = false;
+  const allMembers = (teamsList || []).flatMap(t => t.members || []);
+  const seenTechDate = new Map<string, string>(); // "normName_date" -> leaveId
+
+  const cleanList: LeaveRecord[] = [];
+
+  for (const leave of leavesList) {
+    if (!leave || !leave.techId || !leave.date) continue;
+    const member = allMembers.find(m => m.id === leave.techId);
+    if (!member) {
+      cleanList.push(leave);
+      continue;
+    }
+
+    let actualTechId = leave.techId;
+    const isBeforeJoin = member.joinDate && leave.date < member.joinDate;
+    const isAfterResign = member.resignDate && leave.date >= member.resignDate;
+
+    if (isBeforeJoin && member.transferredFromId) {
+      actualTechId = member.transferredFromId;
+      changed = true;
+    } else if (isAfterResign && member.transferredToId) {
+      actualTechId = member.transferredToId;
+      changed = true;
+    } else if (isBeforeJoin || isAfterResign) {
+      // Find if another record exists for the same technician name that is active on this date
+      const norm = member.name.trim().toLowerCase();
+      const activeRecord = allMembers.find(m =>
+        m.name.trim().toLowerCase() === norm &&
+        (!m.joinDate || m.joinDate <= leave.date) &&
+        (!m.resignDate || leave.date < m.resignDate)
+      );
+      if (activeRecord) {
+        actualTechId = activeRecord.id;
+        changed = true;
+      }
+    }
+
+    const normName = (allMembers.find(m => m.id === actualTechId)?.name || member.name).trim().toLowerCase();
+    const key = `${normName}_${leave.date}`;
+
+    if (seenTechDate.has(key)) {
+      // Duplicate leave for the same technician on the same day! Discard duplicate
+      changed = true;
+      continue;
+    }
+
+    seenTechDate.set(key, leave.id);
+    cleanList.push(actualTechId !== leave.techId ? { ...leave, techId: actualTechId } : leave);
+  }
+
+  return { leaves: cleanList, hasChanged: changed };
+};
 
 export default function App() {
   // --- State Initialization with LocalStorage Persistence ---
@@ -94,12 +182,57 @@ export default function App() {
     }
   });
 
+  // Snapshots for point-in-time recovery & disaster prevention
+  const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([]);
+  const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false);
+
+  // Automated Cloud Backup configuration (hourly, daily, weekly)
+  const [autoBackupConfig, setAutoBackupConfig] = useState<AutoBackupConfig>(() => {
+    try {
+      const saved = localStorage.getItem(`${APP_KEY_PREFIX}auto_backup_config`);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {
+      enabled: true,
+      interval: 'daily',
+      lastBackupTimestamp: 0
+    };
+  });
+
+  const loadSnapshots = async () => {
+    setIsLoadingSnapshots(true);
+    try {
+      const list = await fetchDatabaseSnapshots();
+      setSnapshots(list);
+    } catch (err) {
+      console.error('Error fetching snapshots list:', err);
+    } finally {
+      setIsLoadingSnapshots(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSnapshots();
+  }, []);
+
   const [teams, setTeams] = useState<Team[]>(() => {
     try {
       const saved = localStorage.getItem(`${APP_KEY_PREFIX}teams`);
       if (!saved) return INITIAL_TEAMS;
       const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed.filter(Boolean) : INITIAL_TEAMS;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Strip out any fake technician m11 generated in previous runs
+        const hasFake = parsed.some((t: any) => t?.members?.some((m: any) => m?.id === 'm11' || m?.name === 'ช่างเซฟ'));
+        if (hasFake) {
+          const cleaned = parsed.map((t: any) => ({
+            ...t,
+            members: (t.members || []).filter((m: any) => m.id !== 'm11' && m.name !== 'ช่างเซฟ')
+          }));
+          return cleaned.length > 0 ? cleaned : INITIAL_TEAMS;
+        }
+        return parsed.filter(Boolean);
+      }
+      return INITIAL_TEAMS;
     } catch (e) {
       return INITIAL_TEAMS;
     }
@@ -110,7 +243,24 @@ export default function App() {
       const saved = localStorage.getItem(`${APP_KEY_PREFIX}jobs`);
       if (!saved) return getInitialJobs(getCurrentAutoPeriod().start);
       const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed.filter(Boolean) : getInitialJobs(getCurrentAutoPeriod().start);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Check if this contains the generated batch (e.g. job-t1- or ORD-2026-001)
+        const isGeneratedFakeBatch = parsed.some((j: any) => 
+          (typeof j?.id === 'string' && (j.id.startsWith('job-t1-') || j.id.startsWith('job-t2-'))) ||
+          (typeof j?.orderNo === 'string' && j.orderNo.startsWith('ORD-2026-'))
+        );
+        if (isGeneratedFakeBatch) {
+          return getInitialJobs(getCurrentAutoPeriod().start);
+        }
+        const { jobs: cleanJobs, hasChanged } = sanitizeCorruptedDates(parsed.filter(Boolean));
+        if (hasChanged) {
+          try {
+            localStorage.setItem(`${APP_KEY_PREFIX}jobs`, JSON.stringify(cleanJobs));
+          } catch (e) {}
+        }
+        return cleanJobs;
+      }
+      return getInitialJobs(getCurrentAutoPeriod().start);
     } catch (e) {
       return getInitialJobs(getCurrentAutoPeriod().start);
     }
@@ -132,7 +282,14 @@ export default function App() {
       const saved = localStorage.getItem(`${APP_KEY_PREFIX}holidays`);
       if (!saved) return getInitialHolidays(getCurrentAutoPeriod().start);
       const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed.filter(Boolean) : getInitialHolidays(getCurrentAutoPeriod().start);
+      if (Array.isArray(parsed)) {
+        // Check if this was the fake holidays array
+        if (parsed.includes('2026-08-17') && parsed.includes('2026-08-24')) {
+          return getInitialHolidays(getCurrentAutoPeriod().start);
+        }
+        return parsed.filter(Boolean);
+      }
+      return getInitialHolidays(getCurrentAutoPeriod().start);
     } catch (e) {
       return getInitialHolidays(getCurrentAutoPeriod().start);
     }
@@ -199,18 +356,49 @@ export default function App() {
       isRemoteUpdateRef.current = true;
 
       if (data.jobs && Array.isArray(data.jobs)) {
-        setJobs(data.jobs);
+        const { jobs: cleanJobs, hasChanged } = sanitizeCorruptedDates(data.jobs);
+        setJobs(cleanJobs);
+        if (hasChanged) {
+          saveToRealtimeDb({ jobs: cleanJobs });
+        }
       }
       if (data.teams && Array.isArray(data.teams)) {
-        setTeams(data.teams);
+        // Anti-ghost sanitizer for "ยังไม่ตรวจ" or invalid tech names
+        const ghostIds = new Set<string>();
+        const sanitizedTeams = data.teams.map(t => ({
+          ...t,
+          members: (t.members || []).filter(m => {
+            const isGhost = !m.name || m.name.includes('ยังไม่ตรวจ') || m.name.includes('ตรวจแล้ว') || m.name.includes('ตรวจสอบ');
+            if (isGhost) ghostIds.add(m.id);
+            return !isGhost;
+          })
+        }));
+        setTeams(sanitizedTeams);
+
+        if (ghostIds.size > 0 && data.jobs) {
+          setJobs(prevJobs => prevJobs.map(j => ({
+            ...j,
+            selectedTechs: (j.selectedTechs || []).filter(tid => !ghostIds.has(tid))
+          })));
+        }
       }
-      if (data.leaves && Array.isArray(data.leaves)) setLeaves(data.leaves);
+      if (data.leaves && Array.isArray(data.leaves)) {
+        const currentTeams = (data.teams && Array.isArray(data.teams)) ? data.teams : teams;
+        const sanitized = sanitizeTransferredLeaves(data.leaves, currentTeams);
+        setLeaves(sanitized.leaves);
+        if (sanitized.hasChanged) {
+          saveToRealtimeDb({ leaves: sanitized.leaves });
+        }
+      }
       if (data.holidays && Array.isArray(data.holidays)) setHolidays(data.holidays);
       if (data.period && data.period.start) setPeriod(data.period);
       if (data.savedPeriods && Array.isArray(data.savedPeriods)) setSavedPeriods(data.savedPeriods);
       if (data.rules && typeof data.rules === 'object') setRules(prev => ({ ...prev, ...data.rules }));
       if (data.appUsers && Array.isArray(data.appUsers)) setAppUsers(data.appUsers);
       if (data.themeColor) setThemeColor(data.themeColor);
+      if (data.autoBackupConfig && typeof data.autoBackupConfig === 'object') {
+        setAutoBackupConfig(prev => ({ ...prev, ...data.autoBackupConfig }));
+      }
 
       hasLoadedFromRemoteRef.current = true;
 
@@ -221,7 +409,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // --- Persistence Effects & Realtime Push ---
+  // --- Persistence Effects (LocalStorage + Direct Cloud Firestore Realtime Sync) ---
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem(`${APP_KEY_PREFIX}user`, JSON.stringify(currentUser));
@@ -510,7 +698,7 @@ export default function App() {
     const baseTime = Date.now();
     const total = importedJobsData.length;
     // Row 0 in CSV gets the highest orderIndex so it appears at the very top, row 1 next, row 2 next, etc.
-    const newJobs: Job[] = importedJobsData.map((data, idx) => {
+    const rawNewJobs: Job[] = importedJobsData.map((data, idx) => {
       const type = data.type || 'install';
       const orderIndex = baseTime + (total - idx) * 100;
       return {
@@ -528,15 +716,37 @@ export default function App() {
       };
     });
 
+    const newJobs: Job[] = sanitizeCorruptedDates(rawNewJobs).jobs;
+
+    let mergedJobs: Job[] = [];
     setJobs(prev => {
       const maxExisting = prev.reduce((max, j) => Math.max(max, j.orderIndex || 0), 0);
       const shift = maxExisting >= baseTime ? maxExisting - baseTime + 1000 : 0;
       const adjustedNewJobs = shift > 0
         ? newJobs.map(j => ({ ...j, orderIndex: j.orderIndex + shift }))
         : newJobs;
-      return [...adjustedNewJobs, ...prev];
+      mergedJobs = [...adjustedNewJobs, ...prev];
+      return mergedJobs;
     });
-    showNotification(`นำเข้าข้อมูลเรียบร้อยแล้ว ${newJobs.length} รายการ`);
+
+    // Explicitly write to localStorage and remote DB for maximum reliability
+    try {
+      localStorage.setItem(`${APP_KEY_PREFIX}jobs`, JSON.stringify(mergedJobs.length > 0 ? mergedJobs : newJobs));
+      saveToRealtimeDb({
+        jobs: mergedJobs.length > 0 ? mergedJobs : newJobs,
+        teams: updatedTeams && updatedTeams.length > 0 ? updatedTeams : undefined
+      });
+    } catch (e) {
+      console.warn('Error saving imported jobs directly:', e);
+    }
+
+    const insideCount = newJobs.filter(j => j.date && j.date >= safePeriod.start && j.date <= safePeriod.end).length;
+    const outsideCount = newJobs.length - insideCount;
+    if (outsideCount > 0) {
+      showNotification(`นำเข้าข้อมูลเรียบร้อย ${newJobs.length} รายการ (ตรงกับรอบปัจจุบัน ${insideCount} รายการ, ส่วนอีก ${outsideCount} รายการจะแสดงตามรอบวันที่ของงานนั้นๆ)`);
+    } else {
+      showNotification(`นำเข้าข้อมูลเรียบร้อย ${newJobs.length} รายการ (ตรงตามรอบวันที่ที่เลือก)`);
+    }
   };
 
   const handleUpdateJob = (id: string, field: keyof Job, value: any) => {
@@ -683,17 +893,155 @@ export default function App() {
   };
 
   const handleUpdateMember = (teamId: string, memberId: string, data: Partial<TeamMember>) => {
-    const nextTeams = teams.map(t =>
-      t.id === teamId
-        ? {
-            ...t,
-            members: (t.members || []).map(m => (m.id === memberId ? { ...m, ...data } : m))
-          }
-        : t
-    );
+    const sourceTeam = teams.find(t => t.id === teamId);
+    const currentMember = sourceTeam?.members?.find(m => m.id === memberId);
+    if (!currentMember) return;
+
+    let syncedTargetTeamName: string | null = null;
+    let syncedDate: string | null = null;
+    let syncType: 'departure_to_join' | 'join_to_departure' | null = null;
+
+    // Check if resignDate changed
+    const resignDateChanged = data.resignDate !== undefined && data.resignDate !== currentMember.resignDate;
+    // Check if joinDate changed
+    const joinDateChanged = data.joinDate !== undefined && data.joinDate !== currentMember.joinDate;
+    // Check if name changed
+    const nameChanged = data.name !== undefined && data.name.trim() !== currentMember.name.trim();
+
+    // Find linked counterpart in other teams
+    let linkedTeamId: string | null = null;
+    let linkedMemberId: string | null = null;
+
+    // Priority 1: Check explicit IDs
+    if (currentMember.transferredToId) {
+      for (const t of teams) {
+        if (t.id === teamId) continue;
+        const found = (t.members || []).find(m => m.id === currentMember.transferredToId);
+        if (found) {
+          linkedTeamId = t.id;
+          linkedMemberId = found.id;
+          break;
+        }
+      }
+    } else if (currentMember.transferredFromId) {
+      for (const t of teams) {
+        if (t.id === teamId) continue;
+        const found = (t.members || []).find(m => m.id === currentMember.transferredFromId);
+        if (found) {
+          linkedTeamId = t.id;
+          linkedMemberId = found.id;
+          break;
+        }
+      }
+    }
+
+    // Priority 2: Fallback lookup by matching name & dates if explicit ID was not yet stored
+    if (!linkedMemberId) {
+      const cleanName = currentMember.name.trim().toLowerCase();
+      for (const t of teams) {
+        if (t.id === teamId) continue;
+        const match = (t.members || []).find(m => {
+          if (m.name.trim().toLowerCase() !== cleanName) return false;
+          if (m.transferredFromId === currentMember.id || m.transferredToId === currentMember.id) return true;
+          if (currentMember.resignDate && m.joinDate === currentMember.resignDate) return true;
+          if (m.resignDate && currentMember.joinDate === m.resignDate) return true;
+          return true; // Match by identical name in another team
+        });
+        if (match) {
+          linkedTeamId = t.id;
+          linkedMemberId = match.id;
+          break;
+        }
+      }
+    }
+
+    const nextTeams = teams.map(t => {
+      // 1. Update member in source team
+      if (t.id === teamId) {
+        return {
+          ...t,
+          members: (t.members || []).map(m => {
+            if (m.id !== memberId) return m;
+            const updated = { ...m, ...data };
+            if (linkedTeamId && linkedMemberId) {
+              const targetT = teams.find(x => x.id === linkedTeamId);
+              if (resignDateChanged && !m.transferredToId) {
+                updated.transferredToId = linkedMemberId;
+                updated.transferredToTeamName = targetT?.name;
+              } else if (joinDateChanged && !m.transferredFromId) {
+                updated.transferredFromId = linkedMemberId;
+                updated.transferredFromTeamName = targetT?.name;
+              }
+            }
+            return updated;
+          })
+        };
+      }
+
+      // 2. If this team contains the linked counterpart, synchronize!
+      if (linkedTeamId && t.id === linkedTeamId && linkedMemberId) {
+        return {
+          ...t,
+          members: (t.members || []).map(m => {
+            if (m.id !== linkedMemberId) return m;
+            const updated = { ...m };
+
+            // If name was updated, keep name in sync
+            if (nameChanged && data.name) {
+              updated.name = data.name.trim();
+            }
+
+            // User edited resignDate in old team -> sync joinDate in new team!
+            if (resignDateChanged) {
+              if (data.resignDate) {
+                updated.joinDate = data.resignDate;
+                syncedTargetTeamName = t.name;
+                syncedDate = data.resignDate;
+                syncType = 'departure_to_join';
+              }
+              if (!updated.transferredFromId) {
+                updated.transferredFromId = memberId;
+                updated.transferredFromTeamName = sourceTeam?.name;
+              }
+            }
+            // User edited joinDate in new team -> sync resignDate in old team!
+            else if (joinDateChanged) {
+              if (data.joinDate) {
+                updated.resignDate = data.joinDate;
+                syncedTargetTeamName = t.name;
+                syncedDate = data.joinDate;
+                syncType = 'join_to_departure';
+              }
+              if (!updated.transferredToId) {
+                updated.transferredToId = memberId;
+                updated.transferredToTeamName = sourceTeam?.name;
+              }
+            }
+
+            return updated;
+          })
+        };
+      }
+
+      return t;
+    });
+
     setTeams(nextTeams);
     saveToRealtimeDb({ teams: nextTeams });
-    showNotification('อัปเดตข้อมูลช่างสำเร็จ');
+
+    if (syncType === 'departure_to_join' && syncedTargetTeamName && syncedDate) {
+      showNotification(
+        `อัปเดตข้อมูลช่างสำเร็จ และซิงค์วันเริ่มงานที่ทีมใหม่ (${syncedTargetTeamName}: ${syncedDate}) แล้ว`,
+        'success'
+      );
+    } else if (syncType === 'join_to_departure' && syncedTargetTeamName && syncedDate) {
+      showNotification(
+        `อัปเดตข้อมูลช่างสำเร็จ และซิงค์วันที่ออกจากทีมเดิม (${syncedTargetTeamName}: ${syncedDate}) แล้ว`,
+        'success'
+      );
+    } else {
+      showNotification('อัปเดตข้อมูลช่างสำเร็จ', 'success');
+    }
   };
 
   const handleDeleteMember = (teamId: string, memberId: string) => {
@@ -712,24 +1060,37 @@ export default function App() {
     sourceTeamId: string,
     member: TeamMember,
     targetTeamId: string,
-    effectiveDate: string
+    departureDate: string,
+    newTeamJoinDate?: string
   ) => {
     const sourceTeam = teams.find(t => t.id === sourceTeamId);
     const targetTeam = teams.find(t => t.id === targetTeamId);
 
     if (!sourceTeam || !targetTeam) return;
 
-    // Set resign date for source team record
+    const actualJoinDate = newTeamJoinDate || departureDate;
+    const newMemberId = `m-${Date.now()}`;
+
+    // Set resign date and target link for source team record
     const updatedSourceMembers = (sourceTeam.members || []).map(m =>
-      m.id === member.id ? { ...m, resignDate: effectiveDate } : m
+      m.id === member.id
+        ? {
+            ...m,
+            resignDate: departureDate,
+            transferredToId: newMemberId,
+            transferredToTeamName: targetTeam.name
+          }
+        : m
     );
 
-    // Create new record in target team with join date
+    // Create new record in target team with join date and source link
     const newTargetRecord: TeamMember = {
-      id: `m-${Date.now()}`,
+      id: newMemberId,
       name: member?.name || '',
-      joinDate: effectiveDate,
-      resignDate: undefined
+      joinDate: actualJoinDate,
+      resignDate: undefined,
+      transferredFromId: member.id,
+      transferredFromTeamName: sourceTeam.name
     };
 
     const updatedTargetMembers = [...(targetTeam.members || []), newTargetRecord];
@@ -743,7 +1104,10 @@ export default function App() {
     setTeams(nextTeams);
     saveToRealtimeDb({ teams: nextTeams });
 
-    showNotification(`ย้าย ${member?.name || ''} ไปยัง ${targetTeam?.name || ''} สำเร็จ ระบบคิดสัดส่วนตามวันย้ายให้อัตโนมัติ`);
+    showNotification(
+      `ย้ายช่าง ${member?.name || ''} ไปยัง ${targetTeam?.name || ''} เรียบร้อย (ออกจาก ${sourceTeam.name}: ${departureDate} • เริ่มงาน ${targetTeam.name}: ${actualJoinDate})`,
+      'success'
+    );
   };
 
   const handleResetTeamsToDefault = () => {
@@ -767,30 +1131,62 @@ export default function App() {
   };
 
   const handleSetLeave = (techId: string, dateStr: string, leaveType: LeaveTypeId | 'clear') => {
+    const allMembers = (teams || []).flatMap(t => t.members || []);
+    const targetMember = allMembers.find(m => m.id === techId);
+
+    // Collect all related technician IDs for this person across transfers/teams
+    const relatedTechIds = new Set<string>([techId]);
+    if (targetMember?.transferredToId) relatedTechIds.add(targetMember.transferredToId);
+    if (targetMember?.transferredFromId) relatedTechIds.add(targetMember.transferredFromId);
+    if (targetMember?.name) {
+      const norm = targetMember.name.trim().toLowerCase();
+      allMembers.forEach(m => {
+        if (m.name.trim().toLowerCase() === norm) relatedTechIds.add(m.id);
+      });
+    }
+
     if (leaveType === 'clear') {
-      setLeaves(prev => prev.filter(l => !(l.techId === techId && l.date === dateStr)));
+      setLeaves(prev => prev.filter(l => !(relatedTechIds.has(l.techId) && l.date === dateStr)));
       showNotification('ยกเลิกวันลาสำเร็จ');
     } else {
-      const existing = leaves.find(l => l.techId === techId && l.date === dateStr);
-      if (existing) {
-        setLeaves(prev =>
-          prev.map(l => (l.id === existing.id ? { ...l, type: leaveType } : l))
-        );
-      } else {
-        setLeaves(prev => [
-          ...prev,
-          { id: `l-${Date.now()}`, techId, date: dateStr, type: leaveType }
-        ]);
+      // Guard: Cannot set leave before starting work or after leaving/transferring from this team
+      if (targetMember) {
+        if (targetMember.joinDate && dateStr < targetMember.joinDate) {
+          showNotification(
+            `ไม่สามารถบันทึกวันลาได้เนื่องจากช่างยังไม่ได้เริ่มงานในทีมนี้ (เริ่มงาน ${formatDateTH(targetMember.joinDate)})`,
+            'error'
+          );
+          return;
+        }
+        if (targetMember.resignDate && dateStr >= targetMember.resignDate) {
+          showNotification(
+            `ไม่สามารถบันทึกวันลาได้เนื่องจากช่างย้ายทีมหรือออกจากทีมนี้แล้ว (ตั้งแต่วันที่ ${formatDateTH(targetMember.resignDate)})`,
+            'error'
+          );
+          return;
+        }
       }
+
+      setLeaves(prev => {
+        // Remove any leaves for this technician on dateStr across all related IDs to prevent duplicates
+        const filtered = prev.filter(l => !(relatedTechIds.has(l.techId) && l.date === dateStr));
+        return [
+          ...filtered,
+          { id: `l-${Date.now()}`, techId, date: dateStr, type: leaveType }
+        ];
+      });
 
       // If taking actual leave (not no_inc), unselect tech from jobs on that date
       if (leaveType !== 'no_inc') {
         let removedCount = 0;
         setJobs(prev =>
           prev.map(j => {
-            if (j.date === dateStr && (j.selectedTechs || []).includes(techId)) {
+            if (j.date === dateStr && (j.selectedTechs || []).some(id => relatedTechIds.has(id))) {
               removedCount++;
-              return { ...j, selectedTechs: j.selectedTechs.filter(id => id !== techId) };
+              return {
+                ...j,
+                selectedTechs: j.selectedTechs.filter(id => !relatedTechIds.has(id))
+              };
             }
             return j;
           })
@@ -809,7 +1205,7 @@ export default function App() {
 
   // Clean Ghost Data
   const handleCleanGhostData = () => {
-    requestConfirm('เคลียร์ข้อมูลช่างตกค้าง', 'ระบบจะตรวจสอบและลบรายชื่อช่างที่ไม่อยู่ในทีม หรือลาออกไปแล้วออกจากรายการงานเก่า ยืนยันหรือไม่?', () => {
+    requestConfirm('เคลียร์ข้อมูลช่างตกค้าง', 'ระบบจะตรวจสอบและลบรายชื่อช่างที่ไม่อยู่ในทีม หรือลาออกไปแล้วออกจากรายการงานเก่า รวมถึงลบวันลาที่ซ้ำซ้อน ยืนยันหรือไม่?', () => {
       let cleanedJobs = 0;
       setJobs(prev =>
         prev.map(job => {
@@ -836,29 +1232,358 @@ export default function App() {
           return job;
         })
       );
+
+      // Also clean up duplicate/misplaced leaves
+      const sanitized = sanitizeTransferredLeaves(leaves, teams);
+      if (sanitized.hasChanged) {
+        setLeaves(sanitized.leaves);
+      }
+
       setConfirmModal(null);
-      if (cleanedJobs > 0) {
-        showNotification(`ทำความสะอาดข้อมูลค้างเรียบร้อยใน ${cleanedJobs} งาน`, 'success');
+      if (cleanedJobs > 0 || sanitized.hasChanged) {
+        showNotification(`ทำความสะอาดข้อมูลค้างเรียบร้อย (ปรับปรุง ${cleanedJobs} งาน${sanitized.hasChanged ? ' และเคลียร์วันลาซ้ำซ้อน' : ''})`, 'success');
       } else {
-        showNotification('ไม่พบรายชื่อช่างตกค้างในระบบ', 'info');
+        showNotification('ไม่พบรายชื่อช่างตกค้างหรือวันลาซ้ำซ้อนในระบบ', 'info');
       }
     });
   };
 
-  // Reset sample data
-  const handleResetData = () => {
-    requestConfirm('รีเซ็ตข้อมูลตัวอย่าง', 'ข้อมูลปัจจุบันจะถูกรีเซ็ตกลับเป็นค่าเริ่มต้นตัวอย่าง ยืนยันหรือไม่?', () => {
-      setTeams(INITIAL_TEAMS);
-      setJobs(getInitialJobs(getCurrentAutoPeriod().start));
-      setLeaves(getInitialLeaves(getCurrentAutoPeriod().start));
-      setHolidays(getInitialHolidays(getCurrentAutoPeriod().start));
-      setRules(DEFAULT_INCENTIVE_RULES);
-      setConfirmModal(null);
-      showNotification('รีเซ็ตข้อมูลตัวอย่างเริ่มต้นเรียบร้อยแล้ว');
-    });
+  // Export full JSON backup file directly to computer
+  const handleExportBackupJSON = () => {
+    try {
+      const payload: AppFirebaseData = {
+        teams,
+        jobs,
+        leaves,
+        holidays,
+        period: safePeriod,
+        savedPeriods,
+        rules,
+        appUsers,
+        themeColor,
+        updatedAt: Date.now()
+      };
+      exportFullBackupJSON(payload);
+      showNotification('ดาวน์โหลดไฟล์สำรองข้อมูล (.json) เรียบร้อยแล้ว', 'success');
+    } catch (err: any) {
+      showNotification(`ดาวน์โหลดไม่สำเร็จ: ${err?.message || err}`, 'error');
+    }
   };
 
-  // Clear data for current calculation period (Super Admin only)
+  // Import and restore from uploaded JSON backup file
+  const handleImportBackupJSON = async (file: File) => {
+    const text = await file.text();
+    const imported = parseAndValidateBackupJSON(text);
+
+    // Automatically snapshot current database first for disaster protection
+    await createDatabaseSnapshot(`สำรองก่อนกู้คืนไฟล์ ${file.name}`, {
+      teams,
+      jobs,
+      leaves,
+      holidays,
+      period: safePeriod,
+      savedPeriods,
+      rules,
+      appUsers,
+      themeColor,
+      updatedAt: Date.now()
+    });
+
+    const newTeams = imported.teams || INITIAL_TEAMS;
+    const newJobs = imported.jobs || [];
+    const newLeaves = imported.leaves || [];
+    const newHolidays = imported.holidays || [];
+    const newPeriod = imported.period || safePeriod;
+    const newSavedPeriods = imported.savedPeriods || savedPeriods;
+    const newRules = imported.rules || rules;
+    const newAppUsers = imported.appUsers || appUsers;
+    const newThemeColor = imported.themeColor || themeColor;
+
+    setTeams(newTeams);
+    setJobs(newJobs);
+    setLeaves(newLeaves);
+    setHolidays(newHolidays);
+    setPeriod(newPeriod);
+    setSavedPeriods(newSavedPeriods);
+    setRules(newRules);
+    setAppUsers(newAppUsers);
+    setThemeColor(newThemeColor);
+
+    await saveToRealtimeDb({
+      teams: newTeams,
+      jobs: newJobs,
+      leaves: newLeaves,
+      holidays: newHolidays,
+      period: newPeriod,
+      savedPeriods: newSavedPeriods,
+      rules: newRules,
+      appUsers: newAppUsers,
+      themeColor: newThemeColor,
+      updatedAt: Date.now()
+    });
+
+    await loadSnapshots();
+    showNotification(`กู้คืนข้อมูลสำเร็จ (${newJobs.length} งาน, ${newTeams.length} ทีม)`, 'success');
+  };
+
+  // --- Automated Cloud Backup Engine (Runs on interval: hourly, daily, weekly) ---
+  useEffect(() => {
+    if (!autoBackupConfig.enabled) return;
+
+    const runBackupCheck = async () => {
+      if (!hasLoadedFromRemoteRef.current) return;
+
+      const intervalMs =
+        autoBackupConfig.interval === 'hourly'
+          ? 60 * 60 * 1000 // 1 hour
+          : autoBackupConfig.interval === 'weekly'
+          ? 7 * 24 * 60 * 60 * 1000 // 7 days
+          : 24 * 60 * 60 * 1000; // 1 day
+
+      const last = autoBackupConfig.lastBackupTimestamp || 0;
+      const now = Date.now();
+
+      if (now - last >= intervalMs) {
+        console.log(`[Auto Backup] Initiating automated ${autoBackupConfig.interval} backup to Cloud...`);
+        const intervalLabels: Record<BackupInterval, string> = {
+          hourly: 'ทุก 1 ชั่วโมง',
+          daily: 'ทุก 1 วัน',
+          weekly: 'ทุก 1 สัปดาห์'
+        };
+        const backupTypeMap: Record<BackupInterval, 'auto_hourly' | 'auto_daily' | 'auto_weekly'> = {
+          hourly: 'auto_hourly',
+          daily: 'auto_daily',
+          weekly: 'auto_weekly'
+        };
+
+        const nowStr = new Date(now).toLocaleString('th-TH', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+
+        const label = `สำรองข้อมูลอัตโนมัติ (${intervalLabels[autoBackupConfig.interval]})`;
+
+        try {
+          await createDatabaseSnapshot(
+            label,
+            {
+              teams,
+              jobs,
+              leaves,
+              holidays,
+              period: safePeriod,
+              savedPeriods,
+              rules,
+              appUsers,
+              themeColor,
+              autoBackupConfig: {
+                ...autoBackupConfig,
+                lastBackupTimestamp: now,
+                lastBackupDateStr: nowStr
+              },
+              updatedAt: now
+            },
+            backupTypeMap[autoBackupConfig.interval]
+          );
+
+          const updatedConfig: AutoBackupConfig = {
+            ...autoBackupConfig,
+            lastBackupTimestamp: now,
+            lastBackupDateStr: nowStr
+          };
+
+          setAutoBackupConfig(updatedConfig);
+          localStorage.setItem(`${APP_KEY_PREFIX}auto_backup_config`, JSON.stringify(updatedConfig));
+          saveToRealtimeDb({ autoBackupConfig: updatedConfig });
+          await loadSnapshots();
+          console.log(`[Auto Backup] Successfully backed up at ${nowStr}`);
+        } catch (err) {
+          console.error('[Auto Backup] Failed to backup to Firestore:', err);
+        }
+      }
+    };
+
+    const timer = setInterval(runBackupCheck, 60 * 1000);
+    runBackupCheck();
+
+    return () => clearInterval(timer);
+  }, [autoBackupConfig, teams, jobs, leaves, holidays, safePeriod, savedPeriods, rules, appUsers, themeColor]);
+
+  // Create point-in-time snapshot on Cloud
+  const handleCreateCloudSnapshot = async (label: string) => {
+    const payload: AppFirebaseData = {
+      teams,
+      jobs,
+      leaves,
+      holidays,
+      period: safePeriod,
+      savedPeriods,
+      rules,
+      appUsers,
+      themeColor,
+      updatedAt: Date.now()
+    };
+    await createDatabaseSnapshot(label, payload, 'manual');
+    await loadSnapshots();
+    showNotification('บันทึกจุดกู้คืนบน Cloud สำเร็จ', 'success');
+  };
+
+  // Restore state from a chosen snapshot ID
+  const handleRestoreSnapshot = async (snapshotId: string) => {
+    // Safety snapshot of current before restoring historical
+    await createDatabaseSnapshot('สำรองความปลอดภัยก่อนกู้คืนย้อนหลัง', {
+      teams,
+      jobs,
+      leaves,
+      holidays,
+      period: safePeriod,
+      savedPeriods,
+      rules,
+      appUsers,
+      themeColor,
+      updatedAt: Date.now()
+    }, 'safety');
+
+    const restored = await restoreSnapshotById(snapshotId);
+    if (restored) {
+      if (restored.teams) setTeams(restored.teams);
+      if (restored.jobs) setJobs(restored.jobs);
+      if (restored.leaves) setLeaves(restored.leaves);
+      if (restored.holidays) setHolidays(restored.holidays);
+      if (restored.period) setPeriod(restored.period);
+      if (restored.savedPeriods) setSavedPeriods(restored.savedPeriods);
+      if (restored.rules) setRules(restored.rules);
+      if (restored.appUsers) setAppUsers(restored.appUsers);
+      if (restored.themeColor) setThemeColor(restored.themeColor);
+
+      await loadSnapshots();
+      showNotification('กู้คืนข้อมูลตามจุดกู้คืนเรียบร้อยแล้ว', 'success');
+    }
+  };
+
+  const handleUpdateAutoBackupConfig = (config: AutoBackupConfig) => {
+    setAutoBackupConfig(config);
+    localStorage.setItem(`${APP_KEY_PREFIX}auto_backup_config`, JSON.stringify(config));
+    saveToRealtimeDb({ autoBackupConfig: config });
+    showNotification('บันทึกการตั้งค่าสำรองข้อมูลอัตโนมัติเรียบร้อย', 'success');
+  };
+
+  const handleTriggerAutoBackupNow = async () => {
+    const now = Date.now();
+    const nowStr = new Date(now).toLocaleString('th-TH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    const intervalLabels: Record<BackupInterval, string> = {
+      hourly: 'ทุก 1 ชั่วโมง',
+      daily: 'ทุก 1 วัน',
+      weekly: 'ทุก 1 สัปดาห์'
+    };
+    const backupTypeMap: Record<BackupInterval, 'auto_hourly' | 'auto_daily' | 'auto_weekly'> = {
+      hourly: 'auto_hourly',
+      daily: 'auto_daily',
+      weekly: 'auto_weekly'
+    };
+
+    await createDatabaseSnapshot(
+      `สำรองข้อมูลตามรอบ (${intervalLabels[autoBackupConfig.interval]})`,
+      {
+        teams,
+        jobs,
+        leaves,
+        holidays,
+        period: safePeriod,
+        savedPeriods,
+        rules,
+        appUsers,
+        themeColor,
+        autoBackupConfig: {
+          ...autoBackupConfig,
+          lastBackupTimestamp: now,
+          lastBackupDateStr: nowStr
+        },
+        updatedAt: now
+      },
+      backupTypeMap[autoBackupConfig.interval]
+    );
+
+    const updatedConfig: AutoBackupConfig = {
+      ...autoBackupConfig,
+      lastBackupTimestamp: now,
+      lastBackupDateStr: nowStr
+    };
+    setAutoBackupConfig(updatedConfig);
+    localStorage.setItem(`${APP_KEY_PREFIX}auto_backup_config`, JSON.stringify(updatedConfig));
+    saveToRealtimeDb({ autoBackupConfig: updatedConfig });
+    await loadSnapshots();
+  };
+
+  const handleDeleteSnapshot = async (id: string) => {
+    await deleteDatabaseSnapshot(id);
+    await loadSnapshots();
+  };
+
+  // Reset sample data safely with emergency snapshot
+  const handleResetData = () => {
+    requestConfirm(
+      'รีเซ็ตเป็นชุดข้อมูลเริ่มต้น',
+      'ระบบจะสร้างจุดสำรองข้อมูลบน Cloud ให้ก่อนเสมอ แล้วจึงนำข้อมูลตั้งต้นเริ่มต้น (ช่าง 5 ทีม, รายการงาน 9 งาน) กลับมาใช้งาน ยืนยันหรือไม่?',
+      async () => {
+        // Auto snapshot current state first
+        try {
+          await createDatabaseSnapshot('สำรองก่อนกดรีเซ็ตข้อมูล', {
+            teams,
+            jobs,
+            leaves,
+            holidays,
+            period: safePeriod,
+            savedPeriods,
+            rules,
+            appUsers,
+            themeColor,
+            updatedAt: Date.now()
+          });
+        } catch (e) {
+          console.warn('Auto snapshot error:', e);
+        }
+
+        const curStart = getCurrentAutoPeriod().start;
+        const cleanTeams = INITIAL_TEAMS;
+        const cleanJobs = getInitialJobs(curStart);
+        const cleanLeaves = getInitialLeaves(curStart);
+        const cleanHolidays = getInitialHolidays(curStart);
+        const cleanRules = DEFAULT_INCENTIVE_RULES;
+
+        setTeams(cleanTeams);
+        setJobs(cleanJobs);
+        setLeaves(cleanLeaves);
+        setHolidays(cleanHolidays);
+        setRules(cleanRules);
+
+        await saveToRealtimeDb({
+          teams: cleanTeams,
+          jobs: cleanJobs,
+          leaves: cleanLeaves,
+          holidays: cleanHolidays,
+          rules: cleanRules
+        });
+
+        await loadSnapshots();
+        setConfirmModal(null);
+        showNotification('✅ นำข้อมูลตั้งต้นกลับมาใช้งานเรียบร้อยแล้ว', 'success');
+      }
+    );
+  };
+
+  // Clear data for current calculation period (Super Admin only) with emergency snapshot
   const handleClearPeriodData = () => {
     if (currentUser?.role !== 'super_admin') {
       showNotification('เฉพาะ Super Admin เท่านั้นที่สามารถลบข้อมูลในรอบคำนวณได้', 'warning');
@@ -866,12 +1591,39 @@ export default function App() {
     }
     requestConfirm(
       'ยืนยันการลบข้อมูลในรอบคำนวณ',
-      `คุณต้องการลบรายการงานและวันลาทั้งหมดในรอบคำนวณ (${safePeriod.start} ถึง ${safePeriod.end}) ใช่หรือไม่?`,
-      () => {
+      `ระบบจะสำรองข้อมูลก่อนลบให้เสมอ คุณต้องการลบรายการงานและวันลาทั้งหมดในรอบคำนวณ (${safePeriod.start} ถึง ${safePeriod.end}) ใช่หรือไม่?`,
+      async () => {
+        try {
+          await createDatabaseSnapshot(`สำรองก่อนลบข้อมูลรอบ ${safePeriod.start} ถึง ${safePeriod.end}`, {
+            teams,
+            jobs,
+            leaves,
+            holidays,
+            period: safePeriod,
+            savedPeriods,
+            rules,
+            appUsers,
+            themeColor,
+            updatedAt: Date.now()
+          });
+        } catch (e) {
+          console.warn('Auto snapshot error:', e);
+        }
+
         const start = safePeriod.start;
         const end = safePeriod.end;
-        setJobs(prev => prev.filter(j => j.date && (j.date < start || j.date > end)));
-        setLeaves(prev => prev.filter(l => l.date && (l.date < start || l.date > end)));
+        const updatedJobs = jobs.filter(j => j.date && (j.date < start || j.date > end));
+        const updatedLeaves = leaves.filter(l => l.date && (l.date < start || l.date > end));
+
+        setJobs(updatedJobs);
+        setLeaves(updatedLeaves);
+
+        await saveToRealtimeDb({
+          jobs: updatedJobs,
+          leaves: updatedLeaves
+        });
+
+        await loadSnapshots();
         setConfirmModal(null);
         showNotification(`ลบข้อมูลในรอบคำนวณ ${start} ถึง ${end} เรียบร้อยแล้ว`, 'success');
       }
@@ -1115,6 +1867,16 @@ export default function App() {
             periodStart={safePeriod.start}
             periodEnd={safePeriod.end}
             onClearPeriodData={handleClearPeriodData}
+            onExportBackupJSON={handleExportBackupJSON}
+            onImportBackupJSON={handleImportBackupJSON}
+            onCreateCloudSnapshot={handleCreateCloudSnapshot}
+            snapshots={snapshots}
+            onRestoreSnapshot={handleRestoreSnapshot}
+            isLoadingSnapshots={isLoadingSnapshots}
+            autoBackupConfig={autoBackupConfig}
+            onUpdateAutoBackupConfig={handleUpdateAutoBackupConfig}
+            onDeleteSnapshot={handleDeleteSnapshot}
+            onTriggerAutoBackupNow={handleTriggerAutoBackupNow}
           />
         )}
       </main>

@@ -13,6 +13,10 @@ export interface TeamMember {
   name: string;
   joinDate: string; // YYYY-MM-DD
   resignDate?: string; // YYYY-MM-DD
+  transferredToId?: string; // ID of member in destination team
+  transferredFromId?: string; // ID of member in source team
+  transferredToTeamName?: string; // Name of destination team
+  transferredFromTeamName?: string; // Name of source team
 }
 
 export interface Team {
@@ -144,5 +148,14 @@ export interface ConfirmModalState {
   title: string;
   message: string;
   onConfirm: () => void;
+}
+
+export type BackupInterval = 'hourly' | 'daily' | 'weekly';
+
+export interface AutoBackupConfig {
+  enabled: boolean;
+  interval: BackupInterval;
+  lastBackupTimestamp?: number;
+  lastBackupDateStr?: string;
 }
 

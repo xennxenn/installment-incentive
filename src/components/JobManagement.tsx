@@ -2,8 +2,9 @@ import React, { useState, useRef, useMemo } from 'react';
 import { 
   Search, Plus, FileSpreadsheet, ArrowUp, ArrowDown, CheckSquare, 
   Square, Trash2, X, AlertCircle, CheckCircle2, SlidersHorizontal, Calendar, Clock,
-  Upload, FileUp, Download
+  Upload, FileUp, Download, Eye
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Job, Team, LeaveRecord, JobTypeId, IncentiveRules } from '../types';
 import { JOB_TYPES, TIME_SLOTS, DEFAULT_TIME_SLOT, DEFAULT_INCENTIVE_RULES } from '../data/initialData';
 import { calculateSingleJobIncentive } from '../utils/calculator';
@@ -66,7 +67,6 @@ export const JobManagement: React.FC<JobManagementProps> = ({
   };
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterByPeriod, setFilterByPeriod] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
 
   // CSV Import State
@@ -167,18 +167,135 @@ export const JobManagement: React.FC<JobManagementProps> = ({
     return lines;
   };
 
-  const normalizeDate = (dateStr: string, fallback: string): string => {
-    if (!dateStr) return fallback;
-    const s = dateStr.trim();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    const dmY = s.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/);
-    if (dmY) {
-      const day = dmY[1].padStart(2, '0');
-      const month = dmY[2].padStart(2, '0');
-      const year = dmY[3];
+  const normalizeDate = (rawInput: any, fallback: string, formatHint?: 'MDY' | 'DMY'): string => {
+    if (rawInput === null || rawInput === undefined) return fallback;
+
+    // 1. If it's a JavaScript Date object (from XLSX cellDates: true)
+    if (rawInput instanceof Date && !isNaN(rawInput.getTime())) {
+      const isUtcClean = rawInput.getUTCHours() === 0 && rawInput.getUTCMinutes() === 0;
+      const y = isUtcClean ? rawInput.getUTCFullYear() : rawInput.getFullYear();
+      const m = String((isUtcClean ? rawInput.getUTCMonth() : rawInput.getMonth()) + 1).padStart(2, '0');
+      const d = String(isUtcClean ? rawInput.getUTCDate() : rawInput.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    const s = String(rawInput).trim();
+    if (!s) return fallback;
+
+    // 2. If it's an Excel numeric serial date code (e.g. 45535 or 45123)
+    const num = Number(s);
+    if (!isNaN(num) && num >= 25000 && num <= 75000 && !s.includes('-') && !s.includes('/') && !s.includes('.')) {
+      const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+      const jsDate = new Date(excelEpoch.getTime() + num * 86400 * 1000);
+      if (!isNaN(jsDate.getTime())) {
+        const y = jsDate.getUTCFullYear();
+        const m = String(jsDate.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(jsDate.getUTCDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+    }
+
+    // Helper to fix Thai Buddhist Era (พ.ศ.) or 2-digit years
+    const fixYear = (yStr: string): number => {
+      let y = parseInt(yStr, 10);
+      if (isNaN(y)) return 2026;
+      if (y >= 2400) {
+        y -= 543; // Thai BE e.g. 2569 -> 2026, 2567 -> 2024
+      } else if (y >= 50 && y < 100) {
+        y = 2000 + (y - 43); // Thai BE 2-digit e.g. 69 -> 2026, 67 -> 2024
+      } else if (y < 50) {
+        y = 2000 + y; // CE 2-digit e.g. 26 -> 2026
+      }
+      return y;
+    };
+
+    // 3. ISO / YYYY-MM-DD or YYYY/MM/DD (with optional timestamp)
+    const isoMatch = s.match(/^(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})/);
+    if (isoMatch) {
+      const year = fixYear(isoMatch[1]);
+      const month = isoMatch[2].padStart(2, '0');
+      const day = isoMatch[3].padStart(2, '0');
       return `${year}-${month}-${day}`;
     }
-    return s || fallback;
+
+    // 4. Thai and English month names / abbreviations
+    const THAI_MONTH_MAP: Record<string, string> = {
+      'ม.ค.': '01', 'มกรา': '01', 'มกราคม': '01', 'jan': '01', 'january': '01',
+      'ก.พ.': '02', 'กุมภา': '02', 'กุมภาพันธ์': '02', 'feb': '02', 'february': '02',
+      'มี.ค.': '03', 'มีนา': '03', 'มีนาคม': '03', 'mar': '03', 'march': '03',
+      'เม.ย.': '04', 'เมษา': '04', 'เมษายน': '04', 'apr': '04', 'april': '04',
+      'พ.ค.': '05', 'พฤษภา': '05', 'พฤษภาคม': '05', 'may': '05',
+      'มิ.ย.': '06', 'มิถุนา': '06', 'มิถุนายน': '06', 'jun': '06', 'june': '06',
+      'ก.ค.': '07', 'กรกฎา': '07', 'กรกฎาคม': '07', 'jul': '07', 'july': '07',
+      'ส.ค.': '08', 'สิงหา': '08', 'สิงหาคม': '08', 'aug': '08', 'august': '08',
+      'ก.ย.': '09', 'กันยา': '09', 'กันยายน': '09', 'sep': '09', 'september': '09',
+      'ต.ค.': '10', 'ตุลา': '10', 'ตุลาคม': '10', 'oct': '10', 'october': '10',
+      'พ.ย.': '11', 'พฤศจิกา': '11', 'พฤศจิกายน': '11', 'nov': '11', 'november': '11',
+      'ธ.ค.': '12', 'ธันวา': '12', 'ธันวาคม': '12', 'dec': '12', 'december': '12'
+    };
+
+    const cleanTokens = s.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+    for (const [mName, mNum] of Object.entries(THAI_MONTH_MAP)) {
+      if (cleanTokens.toLowerCase().includes(mName)) {
+        const parts = cleanTokens.split(new RegExp(mName.replace('.', '\\.'), 'i')).map(p => p.trim());
+        if (parts.length >= 2) {
+          const dMatch = parts[0].match(/(\d{1,2})$/);
+          const yMatch = parts[1].match(/^[\s\-\/\.]*(\d{2,4})/);
+          if (dMatch && yMatch) {
+            const day = dMatch[1].padStart(2, '0');
+            const year = fixYear(yMatch[1]);
+            return `${year}-${mNum}-${day}`;
+          }
+        }
+      }
+    }
+
+    // 5. Common formats: DD/MM/YYYY, MM/DD/YYYY, D/M/YY
+    const dmyMatch = cleanTokens.match(/^(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{2,4})/);
+    if (dmyMatch) {
+      let p1 = parseInt(dmyMatch[1], 10);
+      let p2 = parseInt(dmyMatch[2], 10);
+      let year = fixYear(dmyMatch[3]);
+
+      let day = p1;
+      let month = p2;
+
+      if (p2 > 12 && p1 <= 12) {
+        // Definite MM/DD/YYYY e.g. 8/31/26
+        day = p2;
+        month = p1;
+      } else if (p1 > 12 && p2 <= 12) {
+        // Definite DD/MM/YYYY e.g. 31/8/26
+        day = p1;
+        month = p2;
+      } else if (formatHint === 'MDY') {
+        // Column is detected as MM/DD/YYYY
+        day = p2;
+        month = p1;
+      } else if (formatHint === 'DMY') {
+        // Column is detected as DD/MM/YYYY
+        day = p1;
+        month = p2;
+      } else {
+        // Ambiguous (e.g. 9/1/26): check which one falls into the active period
+        const optDMY = `${year}-${String(p2).padStart(2, '0')}-${String(p1).padStart(2, '0')}`;
+        const optMDY = `${year}-${String(p1).padStart(2, '0')}-${String(p2).padStart(2, '0')}`;
+        const inMDY = optMDY >= periodStart && optMDY <= periodEnd;
+        const inDMY = optDMY >= periodStart && optDMY <= periodEnd;
+        if (inMDY && !inDMY) {
+          return optMDY;
+        }
+        if (inDMY && !inMDY) {
+          return optDMY;
+        }
+        day = p1;
+        month = p2;
+      }
+
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+
+    return fallback || s;
   };
 
   const matchJobType = (typeStr: string): JobTypeId => {
@@ -266,76 +383,223 @@ export const JobManagement: React.FC<JobManagementProps> = ({
     return calculateSingleJobIncentive(tempJob, tempTeams, [], rules || DEFAULT_INCENTIVE_RULES);
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setImportFileName(file.name);
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      if (!text) return;
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        alert('ไม่พบชีตข้อมูลในไฟล์ Excel');
+        return;
+      }
 
-      const lines = parseCSVText(text);
-      if (lines.length === 0) return;
+      // 1. Scan workbook sheets to find the best sheet containing job table data
+      let bestWs: any = null;
+      let bestRows: any[][] = [];
+      let maxKeywordScore = -1;
 
-      let dateIdx = 0;
-      let customerIdx = 1;
-      let locationIdx = 2;
-      let orderNoIdx = 3;
-      let timeSlotIdx = 4;
-      let typeIdx = 5;
-      let railsIdx = 6;
-      let teamListIdx = 7;
-      let techListIdx = 8;
-      let checkedIdx = 9;
+      for (const sName of workbook.SheetNames) {
+        const ws = workbook.Sheets[sName];
+        if (!ws) continue;
+        const testRows = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, raw: false, defval: '' });
+        if (!testRows || testRows.length === 0) continue;
 
-      const firstRow = lines[0].map(h => h.toLowerCase().trim());
-      let hasHeader = false;
+        let score = 0;
+        for (let r = 0; r < Math.min(25, testRows.length); r++) {
+          const rowStr = (testRows[r] || []).map((c: any) => String(c || '').toLowerCase().trim()).join(' ');
+          if (rowStr.includes('วัน') || rowStr.includes('date') || rowStr.includes('ว/ด/ป') || rowStr.includes('ว.ด.ป.')) score += 20;
+          if (rowStr.includes('ลูกค้า') || rowStr.includes('customer') || rowStr.includes('ผู้ติดต่อ')) score += 20;
+          if (rowStr.includes('order') || rowStr.includes('ออเดอร์') || rowStr.includes('เลขที่') || rowStr.includes('job') || rowStr.includes('po')) score += 20;
+          if (rowStr.includes('ช่าง') || rowStr.includes('tech') || rowStr.includes('ทีม') || rowStr.includes('installer')) score += 20;
+          if (rowStr.includes('ราง') || rowStr.includes('จำนวน') || rowStr.includes('qty') || rowStr.includes('rails') || rowStr.includes('ปริมาณ')) score += 20;
+          if (rowStr.includes('สถานที่') || rowStr.includes('location') || rowStr.includes('ที่อยู่') || rowStr.includes('โครงการ') || rowStr.includes('หน้างาน')) score += 15;
+          if (rowStr.includes('เวลา') || rowStr.includes('time') || rowStr.includes('รอบ')) score += 10;
+        }
+        score += Math.min(testRows.length, 50);
 
-      firstRow.forEach((h, i) => {
-        if (h.includes('วัน')) { dateIdx = i; hasHeader = true; }
-        else if (h.includes('ลูกค้า')) { customerIdx = i; hasHeader = true; }
-        else if (h.includes('สถานที่')) { locationIdx = i; hasHeader = true; }
-        else if (h.includes('order')) { orderNoIdx = i; hasHeader = true; }
-        else if (h.includes('เวลา')) { timeSlotIdx = i; hasHeader = true; }
-        else if (h.includes('ประเภท')) { typeIdx = i; hasHeader = true; }
-        else if (h.includes('ราง') || h.includes('จำนวน')) { railsIdx = i; hasHeader = true; }
-        else if (h.includes('รายชื่อช่าง') || h.includes('ช่าง')) { techListIdx = i; hasHeader = true; }
-        else if (h.includes('ทีม')) { teamListIdx = i; hasHeader = true; }
-        else if (h.includes('ตรวจ')) { checkedIdx = i; hasHeader = true; }
+        if (score > maxKeywordScore) {
+          maxKeywordScore = score;
+          bestWs = ws;
+          bestRows = testRows;
+        }
+      }
+
+      if (!bestRows || bestRows.length === 0 || !bestWs) {
+        alert('ไฟล์ไม่มีข้อมูลหรือไม่มีชีตที่อ่านได้');
+        return;
+      }
+
+      const bestRawRows: any[][] = XLSX.utils.sheet_to_json<any[]>(bestWs, { header: 1, raw: true, defval: '' });
+
+      // 2. Locate header row by inspecting first 30 rows
+      let headerRowIdx = 0;
+      let highestHeaderMatches = 0;
+
+      for (let r = 0; r < Math.min(30, bestRows.length); r++) {
+        const row = bestRows[r] || [];
+        let matches = 0;
+        row.forEach((cell: any) => {
+          const h = String(cell || '').toLowerCase().trim();
+          if (
+            h.includes('วัน') || h.includes('date') || h.includes('ว/ด/ป') || h.includes('ว.ด.ป.') ||
+            h.includes('ลูกค้า') || h.includes('customer') || h.includes('ผู้ติดต่อ') ||
+            h.includes('สถานที่') || h.includes('ที่อยู่') || h.includes('location') || h.includes('site') || h.includes('โครงการ') || h.includes('หน้างาน') ||
+            h.includes('order') || h.includes('ออเดอร์') || h.includes('เลขที่') || h.includes('job') || h.includes('po') || h.includes('ใบงาน') ||
+            h.includes('เวลา') || h.includes('time') || h.includes('รอบ') ||
+            h.includes('ประเภท') || h.includes('type') || h.includes('รายการ') ||
+            h.includes('ราง') || h.includes('จำนวน') || h.includes('ตรม') || h.includes('qty') || h.includes('rails') || h.includes('ปริมาณ') ||
+            h.includes('ช่าง') || h.includes('ทีม') || h.includes('tech') || h.includes('installer') || h.includes('ตรวจ') || h.includes('status')
+          ) {
+            matches++;
+          }
+        });
+
+        if (matches > highestHeaderMatches) {
+          highestHeaderMatches = matches;
+          headerRowIdx = r;
+        }
+      }
+
+      const headers = (bestRows[headerRowIdx] || []).map((c: any) => String(c || '').trim());
+      const dataRows = bestRows.slice(headerRowIdx + 1);
+
+      let dateIdx = -1;
+      let customerIdx = -1;
+      let locationIdx = -1;
+      let orderNoIdx = -1;
+      let timeSlotIdx = -1;
+      let typeIdx = -1;
+      let railsIdx = -1;
+      let checkedIdx = -1;
+      const techColIndices: number[] = [];
+
+      // Safeguard: Check if header is an inspection / verification column
+      const isInspectionCol = (h: string) => {
+        const lower = h.toLowerCase();
+        return (
+          lower.includes('ตรวจ') ||
+          lower.includes('สถานะ') ||
+          lower.includes('status') ||
+          lower.includes('qc') ||
+          lower.includes('pass') ||
+          lower.includes('หมายเหตุ') ||
+          lower.includes('remark')
+        );
+      };
+
+      headers.forEach((hRaw, i) => {
+        const h = hRaw.toLowerCase().trim();
+        if (!h) return;
+
+        // Check if inspection column FIRST so it can NEVER be matched as technician
+        if (isInspectionCol(h)) {
+          if (checkedIdx === -1) checkedIdx = i;
+          return;
+        }
+
+        if (h.includes('วัน') || h.includes('date') || h.includes('ว/ด/ป') || h.includes('ว.ด.ป.')) {
+          if (dateIdx === -1) dateIdx = i;
+        } else if (h.includes('ลูกค้า') || h.includes('customer') || h.includes('ผู้ติดต่อ') || h.includes('ผู้ว่าจ้าง') || h.includes('client')) {
+          if (customerIdx === -1) customerIdx = i;
+        } else if (h.includes('สถานที่') || h.includes('ที่อยู่') || h.includes('location') || h.includes('site') || h.includes('โซน') || h.includes('โครงการ') || h.includes('หมู่บ้าน') || h.includes('หน้างาน') || h.includes('address')) {
+          if (locationIdx === -1) locationIdx = i;
+        } else if (h.includes('order') || h.includes('เลขออเดอร์') || h.includes('เลขที่') || h.includes('job') || h.includes('id') || h.includes('po') || h.includes('ใบงาน') || h.includes('invoice') || h.includes('no.')) {
+          if (orderNoIdx === -1) orderNoIdx = i;
+        } else if (h.includes('เวลา') || h.includes('time') || h.includes('ช่วงเวลา') || h.includes('รอบ')) {
+          if (timeSlotIdx === -1) timeSlotIdx = i;
+        } else if (h.includes('ประเภท') || h.includes('type') || h.includes('ลักษณะ') || h.includes('รายการ')) {
+          if (typeIdx === -1) typeIdx = i;
+        } else if (h.includes('ราง') || h.includes('จำนวน') || h.includes('ตรม') || h.includes('ตร.ม.') || h.includes('qty') || h.includes('rails') || h.includes('sqm') || h.includes('ปริมาณ') || h.includes('เมตร') || h.includes('ผ้าม่าน')) {
+          if (railsIdx === -1) railsIdx = i;
+        } else if (
+          h.includes('ช่าง') ||
+          h.includes('ทีม') ||
+          h.includes('ผู้ติดตั้ง') ||
+          h.includes('tech') ||
+          h.includes('installer') ||
+          h.includes('ปฏิบัติงาน') ||
+          h.includes('เข้างาน') ||
+          h.includes('ผู้รับผิดชอบ')
+        ) {
+          techColIndices.push(i);
+        }
       });
 
-      const dataRows = hasHeader ? lines.slice(1) : lines;
-      const parsedJobs: Partial<Job>[] = [];
+      // Default fallbacks if header names were non-standard
+      if (dateIdx === -1) dateIdx = 0;
+      if (customerIdx === -1) customerIdx = 1;
+      if (locationIdx === -1) locationIdx = 2;
+      if (orderNoIdx === -1) orderNoIdx = 3;
+      if (timeSlotIdx === -1) timeSlotIdx = 4;
+      if (typeIdx === -1) typeIdx = 5;
+      if (railsIdx === -1) railsIdx = 6;
+      if (techColIndices.length === 0) {
+        techColIndices.push(7, 8);
+      }
+      if (checkedIdx === -1 && headers.length > 9) {
+        checkedIdx = 9;
+      }
+
+      // Blacklist of strings that must NEVER be registered as technician names
+      const BLACKLISTED_TECH_VALUES = new Set([
+        'ยังไม่ตรวจ', 'ตรวจแล้ว', 'ตรวจสอบแล้ว', 'รอตรวจ', 'รอตรวจสอบ', 'ตรวจ', 'ตรวจสอบ',
+        'ผ่าน', 'ไม่ผ่าน', 'แก้ไข', 'ยกเลิก', 'ไม่มี', 'ไม่ได้เข้า', '-', '--', '---',
+        'ช่างยังไม่ตรวจ', 'ช่างตรวจแล้ว', 'ช่างตรวจสอบ', 'ยังไม่ได้ตรวจ', 'ไม่ระบุ',
+        'null', 'undefined', 'nan', 'true', 'false', 'yes', 'no'
+      ]);
 
       let currentTeamsState = [...(teams || [])];
       let teamsWereModified = false;
 
-      const matchOrAddTech = (rawName: string): string | null => {
-        const cleanName = rawName.replace(/^ช่าง/, '').trim();
-        if (!cleanName) return null;
+      // Match existing technician or register genuine human technician
+      const matchOrRegisterTech = (rawName: string): string | null => {
+        if (!rawName) return null;
+        let clean = rawName
+          .replace(/^[#\-*•\s]+|[#\-*•\s]+$/g, '')
+          .replace(/\(.*?\)/g, '')
+          .trim();
+        if (!clean) return null;
+
+        // Anti-ghost blacklists
+        if (BLACKLISTED_TECH_VALUES.has(clean) || BLACKLISTED_TECH_VALUES.has(clean.toLowerCase())) return null;
+        if (clean.includes('ตรวจ') || clean.includes('status') || clean.includes('สถานะ') || clean.includes('ยังไม่')) return null;
+
+        const noPrefix = clean.replace(/^ช่าง/, '').trim();
+        if (!noPrefix || noPrefix.length < 2) return null;
+        if (BLACKLISTED_TECH_VALUES.has(noPrefix)) return null;
 
         // Search in existing teams
         const allMembers = currentTeamsState.flatMap(t => t.members || []);
-        let found = allMembers.find(
-          m => m.name.trim() === rawName.trim() || m.name.replace(/^ช่าง/, '').trim() === cleanName
-        );
 
-        if (!found && cleanName.length >= 2) {
+        // 1. Exact match
+        let found = allMembers.find(m => {
+          const mClean = m.name.replace(/^ช่าง/, '').trim();
+          return m.name.trim() === clean || mClean === noPrefix;
+        });
+
+        // 2. Nickname match
+        if (!found && noPrefix.length >= 2) {
           found = allMembers.find(m => {
             const mClean = m.name.replace(/^ช่าง/, '').trim();
-            return mClean.includes(cleanName) || cleanName.includes(mClean);
+            return mClean.includes(noPrefix) || noPrefix.includes(mClean);
           });
         }
 
         if (found) return found.id;
 
-        // Auto-create missing technician and add to first team
+        // Validate that this is a genuine technician name (not random sentence or number)
+        if (noPrefix.length > 25 || /^\d+$/.test(noPrefix) || noPrefix.includes('เมตร') || noPrefix.includes('บาท')) {
+          return null;
+        }
+
+        // New genuine technician found in import file! Auto-register
         teamsWereModified = true;
         const newTechId = `m-imp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-        const fullTechName = rawName.trim().startsWith('ช่าง') ? rawName.trim() : `ช่าง${rawName.trim()}`;
+        const fullTechName = clean.startsWith('ช่าง') ? clean : `ช่าง${noPrefix}`;
         const newMember = { id: newTechId, name: fullTechName, joinDate: '2020-01-01' };
 
         if (currentTeamsState.length > 0) {
@@ -356,34 +620,90 @@ export const JobManagement: React.FC<JobManagementProps> = ({
         return newTechId;
       };
 
-      dataRows.forEach(row => {
-        if (!row || row.length < 2) return;
-        const rawDate = row[dateIdx] || '';
-        const dateStr = normalizeDate(rawDate, periodStart);
-        const customer = row[customerIdx] || '';
-        const location = row[locationIdx] || '';
-        
-        let rawOrderNo = (row[orderNoIdx] || '').trim();
+      const parsedJobs: Partial<Job>[] = [];
+
+      // Detect date column format hint (MDY vs DMY) from unambiguous rows
+      let formatHint: 'MDY' | 'DMY' | undefined = undefined;
+      for (let r = headerRowIdx + 1; r < bestRows.length; r++) {
+        const rowVal = String(bestRows[r]?.[dateIdx] || '').trim();
+        const m = rowVal.match(/^(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{2,4})/);
+        if (m) {
+          const p1 = parseInt(m[1], 10);
+          const p2 = parseInt(m[2], 10);
+          if (p2 > 12 && p1 <= 12) {
+            formatHint = 'MDY';
+            break;
+          }
+          if (p1 > 12 && p2 <= 12) {
+            formatHint = 'DMY';
+            break;
+          }
+        }
+      }
+
+      dataRows.forEach((row, rIdx) => {
+        if (!row || row.length === 0) return;
+        const hasAnyContent = row.some((c: any) => String(c || '').trim().length > 0);
+        if (!hasAnyContent) return;
+
+        const rawCell = bestRawRows[headerRowIdx + 1 + rIdx]?.[dateIdx];
+        const formattedCell = row[dateIdx];
+        const dateInput = (rawCell instanceof Date || (typeof rawCell === 'number' && rawCell > 25000 && rawCell < 75000))
+          ? rawCell
+          : formattedCell;
+        const dateStr = normalizeDate(dateInput, periodStart, formatHint);
+        const customer = String(row[customerIdx] || '').trim();
+        const location = String(row[locationIdx] || '').trim();
+
+        let rawOrderNo = String(row[orderNoIdx] || '').trim();
         if (rawOrderNo === '-' || !rawOrderNo) rawOrderNo = '-';
         else rawOrderNo = rawOrderNo.toUpperCase();
 
-        const timeSlot = row[timeSlotIdx] || DEFAULT_TIME_SLOT;
-        const type = matchJobType(row[typeIdx] || '');
-        const rails = parseFloat(row[railsIdx]) || 0;
+        const timeSlot = String(row[timeSlotIdx] || '').trim() || DEFAULT_TIME_SLOT;
+        const type = matchJobType(String(row[typeIdx] || ''));
+        const rails = parseFloat(String(row[railsIdx] || '')) || 0;
 
-        const rawTechText = (row[techListIdx] || '') + ' ' + (row[teamListIdx] || '');
-        const techParts = rawTechText.split(/[,/+]|\s+และ\s+/).map(s => s.trim()).filter(Boolean);
+        // Parse technicians from ALL matched technician columns
         const selectedTechs: string[] = [];
+        techColIndices.forEach(colI => {
+          if (colI === checkedIdx) return; // Safeguard
+          const rawCell = String(row[colI] || '').trim();
+          if (!rawCell) return;
 
-        techParts.forEach(part => {
-          const tid = matchOrAddTech(part);
-          if (tid && !selectedTechs.includes(tid)) {
-            selectedTechs.push(tid);
-          }
+          // Replace delimiters: newlines, slashes, backslashes, commas, semicolons, pluses, ampersands, 'และ', 'กับ'
+          let normalized = rawCell
+            .replace(/[\r\n]+/g, ',')
+            .replace(/[/\\+;&|]/g, ',')
+            .replace(/\s+และ\s+/g, ',')
+            .replace(/\s+กับ\s+/g, ',')
+            .replace(/\s+หรือ\s+/g, ',');
+
+          // Split consecutive space-separated technicians e.g. "ช่างนาย ช่างเซฟ"
+          normalized = normalized.replace(/([^\s,]+)\s+ช่าง/g, '$1, ช่าง');
+
+          const parts = normalized.split(/[,]+/).map(s => s.trim()).filter(Boolean);
+
+          parts.forEach(part => {
+            const tid = matchOrRegisterTech(part);
+            if (tid && !selectedTechs.includes(tid)) {
+              selectedTechs.push(tid);
+            }
+          });
         });
 
-        const rawChecked = (row[checkedIdx] || '').trim();
-        const isChecked = rawChecked === 'ตรวจแล้ว' || rawChecked === 'ตรวจสอบแล้ว' || rawChecked === 'true';
+        // Parse Inspection / Verification status
+        let isChecked = false;
+        if (checkedIdx !== -1 && row[checkedIdx] !== undefined) {
+          const rawChecked = String(row[checkedIdx] || '').trim().toLowerCase();
+          isChecked = (
+            rawChecked === 'ตรวจแล้ว' ||
+            rawChecked === 'ตรวจสอบแล้ว' ||
+            rawChecked === 'true' ||
+            rawChecked === 'yes' ||
+            rawChecked === 'ผ่าน' ||
+            rawChecked === 'pass'
+          );
+        }
 
         parsedJobs.push({
           date: dateStr,
@@ -398,6 +718,11 @@ export const JobManagement: React.FC<JobManagementProps> = ({
         });
       });
 
+      if (parsedJobs.length === 0) {
+        alert('ไม่พบแถวข้อมูลงานติดตั้งในไฟล์ที่เลือก กรุณาตรวจสอบหัวตารางและเนื้อหาในไฟล์');
+        return;
+      }
+
       if (teamsWereModified) {
         setPendingUpdatedTeams(currentTeamsState);
       } else {
@@ -406,11 +731,11 @@ export const JobManagement: React.FC<JobManagementProps> = ({
 
       setImportPreviewJobs(parsedJobs);
       setShowImportModal(true);
-
       if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-
-    reader.readAsText(file, 'UTF-8');
+    } catch (err: any) {
+      console.error('Error importing file:', err);
+      alert('เกิดข้อผิดพลาดในการเปิดไฟล์: ' + (err?.message || 'โปรดตรวจสอบไฟล์ Excel/CSV'));
+    }
   };
 
   const handleConfirmImport = () => {
@@ -423,9 +748,13 @@ export const JobManagement: React.FC<JobManagementProps> = ({
     setPendingUpdatedTeams(null);
   };
 
+  const otherPeriodsJobsCount = React.useMemo(() => {
+    return (jobs || []).filter(j => !j.date || j.date < periodStart || j.date > periodEnd).length;
+  }, [jobs, periodStart, periodEnd]);
+
   const displayJobs = React.useMemo(() => {
     const list = jobs.filter(j => {
-      const inPeriod = !filterByPeriod || !j.date || (j.date >= periodStart && j.date <= periodEnd);
+      const inPeriod = Boolean(j.date && j.date >= periodStart && j.date <= periodEnd);
       const q = searchQuery.toLowerCase();
       const matchesSearch =
         !q ||
@@ -456,7 +785,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
       // 'manual': strictly by orderIndex descending (Row 1 on top)
       return [...list].sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0));
     }
-  }, [jobs, filterByPeriod, periodStart, periodEnd, searchQuery, jobSortOrder]);
+  }, [jobs, periodStart, periodEnd, searchQuery, jobSortOrder]);
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
@@ -467,18 +796,10 @@ export const JobManagement: React.FC<JobManagementProps> = ({
           <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-semibold">
             {displayJobs.length} งาน
           </span>
-          <button
-            onClick={() => setFilterByPeriod(!filterByPeriod)}
-            className={`text-xs px-2.5 py-1 rounded-lg border font-semibold flex items-center gap-1.5 transition-colors ${
-              filterByPeriod
-                ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
-                : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'
-            }`}
-            title="คลิกเพื่อสลับการกรองแสดงเฉพาะในรอบคำนวณ"
-          >
-            <Calendar size={13} />
-            <span>{filterByPeriod ? `รอบ: ${periodStart} ถึง ${periodEnd}` : 'แสดงทุกรอบคำนวณ'}</span>
-          </button>
+          <div className="text-xs px-2.5 py-1 rounded-lg border border-blue-200 bg-blue-50 text-blue-800 font-semibold flex items-center gap-1.5 shadow-2xs">
+            <Calendar size={13} className="text-blue-600 shrink-0" />
+            <span>เฉพาะรอบวันที่: {periodStart} ถึง {periodEnd}</span>
+          </div>
         </div>
 
         {/* Controls */}
@@ -519,17 +840,17 @@ export const JobManagement: React.FC<JobManagementProps> = ({
             <input
               type="file"
               ref={fileInputRef}
-              accept=".csv,text/csv"
+              accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
               onChange={handleFileSelect}
               className="hidden"
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
-              title="นำเข้าข้อมูลงานจากไฟล์ CSV"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+              title="นำเข้าข้อมูลงานจากไฟล์ Excel (.xlsx, .xls) หรือ CSV"
             >
               <Upload size={14} />
-              <span>นำเข้า CSV</span>
+              <span>นำเข้า Excel / CSV</span>
             </button>
 
             <button
@@ -812,8 +1133,36 @@ export const JobManagement: React.FC<JobManagementProps> = ({
 
             {displayJobs.length === 0 && (
               <tr>
-                <td colSpan={10} className="text-center py-12 text-gray-400">
-                  ไม่พบรายการงานติดตั้งผ้าม่าน
+                <td colSpan={10} className="text-center py-12">
+                  {jobs.length > 0 && otherPeriodsJobsCount > 0 ? (
+                    <div className="flex flex-col items-center justify-center space-y-3 p-4">
+                      <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <Calendar size={24} />
+                      </div>
+                      <div className="text-sm font-bold text-gray-800">
+                        ไม่พบรายการงานติดตั้งในช่วงรอบวันที่ {periodStart} ถึง {periodEnd}
+                      </div>
+                      <p className="text-xs text-gray-500 max-w-md">
+                        ระบบแสดงเฉพาะงานที่อยู่ในรอบที่เลือกเท่านั้น (มีข้อมูลงานในระบบ {jobs.length} รายการซึ่งวันที่อยู่ในรอบอื่น หากต้องการดูข้อมูล กรุณาสลับเลือกรอบคำนวณที่เมนูด้านบน)
+                      </p>
+                    </div>
+                  ) : searchQuery ? (
+                    <div className="flex flex-col items-center justify-center space-y-2 p-4">
+                      <div className="text-sm font-semibold text-gray-700">
+                        ไม่พบรายการที่ตรงกับคำค้นหา "{searchQuery}"
+                      </div>
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="text-xs text-blue-600 font-bold hover:underline cursor-pointer"
+                      >
+                        ล้างคำค้นหา
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-gray-400 py-6">
+                      ไม่พบรายการงานติดตั้งผ้าม่านในรอบนี้
+                    </div>
+                  )}
                 </td>
               </tr>
             )}
@@ -1041,7 +1390,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
         </div>
       )}
 
-      {/* CSV Import Preview Modal */}
+      {/* Excel / CSV Import Preview Modal */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-gray-100">
@@ -1053,7 +1402,7 @@ export const JobManagement: React.FC<JobManagementProps> = ({
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-800 text-base">
-                    ตรวจสอบข้อมูลก่อนนำเข้า CSV (Preview Import)
+                    ตรวจสอบข้อมูลก่อนนำเข้า Excel / CSV (Preview Import)
                   </h3>
                   <p className="text-xs text-gray-500">
                     ไฟล์: <span className="font-semibold text-gray-700">{importFileName}</span> | พบทั้งหมด{' '}
@@ -1066,11 +1415,11 @@ export const JobManagement: React.FC<JobManagementProps> = ({
                 <button
                   type="button"
                   onClick={handleDownloadTemplate}
-                  className="text-xs text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 font-semibold"
+                  className="text-xs text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
                   title="ดาวน์โหลดไฟล์ตัวอย่าง Template CSV"
                 >
                   <Download size={13} />
-                  <span>โหลด Template CSV</span>
+                  <span>โหลด Template (CSV)</span>
                 </button>
                 <button
                   onClick={() => setShowImportModal(false)}
