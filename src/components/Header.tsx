@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { 
   BarChart3, FileText, Users, Calendar, FileSpreadsheet, Shield, 
-  Printer, LogOut, FolderPlus, X, Pencil, Sparkles, Sliders, Cloud
+  Printer, LogOut, FolderPlus, X, Pencil, Sparkles, Sliders, Cloud,
+  Coins
 } from 'lucide-react';
 import { AppUser, PayPeriod } from '../types';
 import { getAutoPeriodForMonth } from '../utils/periodUtils';
@@ -25,6 +26,7 @@ interface HeaderProps {
 const MAIN_TABS = [
   { id: 'dashboard', icon: BarChart3, label: 'ภาพรวม (Dashboard)' },
   { id: 'jobs', icon: FileText, label: 'บันทึกงาน (Jobs)' },
+  { id: 'other_incomes', icon: Coins, label: 'ค่าอื่นๆ (Other Incomes)' },
   { id: 'teams', icon: Users, label: 'ทีมช่าง (Teams)' },
   { id: 'calendar', icon: Calendar, label: 'ปฏิทินวันลา (Calendar)' },
   { id: 'reports', icon: FileSpreadsheet, label: 'รายงาน (Reports)' }

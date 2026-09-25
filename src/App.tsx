@@ -7,7 +7,8 @@ import {
 import { 
   AppUser, Team, TeamMember, Job, LeaveRecord, PayPeriod, 
   IncentiveRules, NotificationState, ConfirmModalState, LeaveTypeId,
-  RuleVersion, PeriodRuleSaveOptions, AutoBackupConfig, BackupInterval
+  RuleVersion, PeriodRuleSaveOptions, AutoBackupConfig, BackupInterval,
+  OtherIncomeRecord
 } from './types';
 
 import { 
@@ -19,6 +20,7 @@ import { calculateIncentives, getEffectiveRulesForPeriod, calculateSingleJobInce
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { JobManagement } from './components/JobManagement';
+import { OtherIncomeManagement } from './components/OtherIncomeManagement';
 import { TeamManagement } from './components/TeamManagement';
 import { CalendarLeave } from './components/CalendarLeave';
 import { Reports } from './components/Reports';
@@ -348,6 +350,17 @@ export default function App() {
     }
   });
 
+  const [otherIncomes, setOtherIncomes] = useState<OtherIncomeRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem(`${APP_KEY_PREFIX}other_incomes`);
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [jobSortOrder, setJobSortOrder] = useState<'asc' | 'desc' | 'manual'>('manual');
   const [notification, setNotification] = useState<NotificationState | null>(null);
@@ -409,6 +422,9 @@ export default function App() {
       if (data.themeColor) setThemeColor(data.themeColor);
       if (data.autoBackupConfig && typeof data.autoBackupConfig === 'object') {
         setAutoBackupConfig(prev => ({ ...prev, ...data.autoBackupConfig }));
+      }
+      if (data.otherIncomes && Array.isArray(data.otherIncomes)) {
+        setOtherIncomes(data.otherIncomes);
       }
 
       hasLoadedFromRemoteRef.current = true;
@@ -477,6 +493,13 @@ export default function App() {
       saveToRealtimeDb({ holidays });
     }
   }, [holidays]);
+
+  useEffect(() => {
+    localStorage.setItem(`${APP_KEY_PREFIX}other_incomes`, JSON.stringify(otherIncomes));
+    if (hasLoadedFromRemoteRef.current && !isRemoteUpdateRef.current) {
+      saveToRealtimeDb({ otherIncomes });
+    }
+  }, [otherIncomes]);
 
   useEffect(() => {
     localStorage.setItem(`${APP_KEY_PREFIX}theme_color`, themeColor);
@@ -874,6 +897,46 @@ export default function App() {
     link.click();
     document.body.removeChild(link);
     showNotification('ส่งออกไฟล์ CSV สำเร็จ');
+  };
+
+  // Other Incomes Handlers
+  const handleAddOtherIncome = (record: Omit<OtherIncomeRecord, 'id' | 'createdAt'>) => {
+    const newRec: OtherIncomeRecord = {
+      ...record,
+      id: `inc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      createdAt: new Date().toISOString()
+    };
+    const updated = [newRec, ...otherIncomes];
+    setOtherIncomes(updated);
+    localStorage.setItem(`${APP_KEY_PREFIX}other_incomes`, JSON.stringify(updated));
+    saveToRealtimeDb({ otherIncomes: updated });
+    showNotification('บันทึกรายการรายได้อื่นๆ เรียบร้อยแล้ว', 'success');
+  };
+
+  const handleUpdateOtherIncome = (id: string, record: Partial<OtherIncomeRecord>) => {
+    const updated = otherIncomes.map(r => r.id === id ? { ...r, ...record } : r);
+    setOtherIncomes(updated);
+    localStorage.setItem(`${APP_KEY_PREFIX}other_incomes`, JSON.stringify(updated));
+    saveToRealtimeDb({ otherIncomes: updated });
+    showNotification('อัปเดตรายการรายได้อื่นๆ เรียบร้อยแล้ว', 'success');
+  };
+
+  const handleDeleteOtherIncome = (id: string) => {
+    const updated = otherIncomes.filter(r => r.id !== id);
+    setOtherIncomes(updated);
+    localStorage.setItem(`${APP_KEY_PREFIX}other_incomes`, JSON.stringify(updated));
+    saveToRealtimeDb({ otherIncomes: updated });
+    showNotification('ลบรายการเรียบร้อยแล้ว', 'info');
+  };
+
+  const handleDeleteMultipleOtherIncomes = (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+    const idSet = new Set(ids);
+    const updated = otherIncomes.filter(r => !idSet.has(r.id));
+    setOtherIncomes(updated);
+    localStorage.setItem(`${APP_KEY_PREFIX}other_incomes`, JSON.stringify(updated));
+    saveToRealtimeDb({ otherIncomes: updated });
+    showNotification(`ลบรายการเรียบร้อยแล้ว ${ids.length} รายการ`, 'info');
   };
 
   // Team & Member Management Handlers
@@ -1917,6 +1980,20 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'other_incomes' && (
+          <OtherIncomeManagement
+            otherIncomes={otherIncomes}
+            teams={teams}
+            curtainPeriod={safePeriod}
+            onAddOtherIncome={handleAddOtherIncome}
+            onUpdateOtherIncome={handleUpdateOtherIncome}
+            onDeleteOtherIncome={handleDeleteOtherIncome}
+            onDeleteMultipleOtherIncomes={handleDeleteMultipleOtherIncomes}
+            themeColor={themeColor}
+            themeTextColor={themeTextColor}
+          />
+        )}
+
         {activeTab === 'teams' && (
           <TeamManagement
             teams={teams}
@@ -1950,6 +2027,7 @@ export default function App() {
             teams={teams}
             calcData={calcData}
             period={safePeriod}
+            otherIncomes={otherIncomes}
             themeColor={themeColor}
             themeTextColor={themeTextColor}
           />

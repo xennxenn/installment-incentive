@@ -161,3 +161,20 @@ export interface AutoBackupConfig {
   lastBackupDateStr?: string;
 }
 
+export type OtherIncomeCategory = 'allowance' | 'ac_install' | 'other';
+
+export type AllowanceType = 'upcountry_300' | 'abroad_800';
+
+export interface OtherIncomeRecord {
+  id: string;
+  techId: string; // Member ID
+  date: string; // YYYY-MM-DD
+  category: OtherIncomeCategory; // 'allowance' | 'ac_install' | 'other'
+  allowanceType?: AllowanceType; // 'upcountry_300' (300) | 'abroad_800' (800)
+  amount: number; // Baht
+  title?: string; // รายการ/รายละเอียด เช่น "เบี้ยเลี้ยงต่างจังหวัด", "ติดตั้งแอร์", "ค่าเดินทางพิเศษ"
+  note?: string; // หมายเหตุเพิ่มเติม
+  createdAt?: string;
+  updatedAt?: string;
+}
+

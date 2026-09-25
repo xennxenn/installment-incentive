@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { Printer, Users, User, Layers, LayoutDashboard, FileSpreadsheet, ClipboardList, CheckSquare, AlertCircle } from 'lucide-react';
-import { Team, PayPeriod } from '../types';
+import { Printer, Users, User, Layers, LayoutDashboard, FileSpreadsheet, ClipboardList, CheckSquare, AlertCircle, Coins, Award } from 'lucide-react';
+import { Team, PayPeriod, OtherIncomeRecord } from '../types';
 import { CalculationResult, formatDateTH, getTechOfficialName, isMemberActiveInPeriod } from '../utils/calculator';
+import { getAllowancePeriodMatchingCurtainPeriod } from '../utils/periodUtils';
 import { LOGO_URL } from '../data/initialData';
 
 interface ReportsProps {
   teams: Team[];
   calcData: CalculationResult;
   period: PayPeriod;
+  otherIncomes?: OtherIncomeRecord[];
   themeColor: string;
   themeTextColor: string;
 }
@@ -16,13 +18,16 @@ export const Reports: React.FC<ReportsProps> = ({
   teams,
   calcData,
   period,
+  otherIncomes = [],
   themeColor,
   themeTextColor
 }) => {
-  const [reportType, setReportType] = useState<'overview' | 'team' | 'tech' | 'job_types' | 'jobs_list'>('overview');
+  const [reportType, setReportType] = useState<'overview' | 'team' | 'tech' | 'job_types' | 'jobs_list' | 'total_compensation'>('overview');
   const [jobTypeViewSubtab, setJobTypeViewSubtab] = useState<'overall' | 'by_team' | 'by_tech'>('overall');
   const [selectedTeamId, setSelectedTeamId] = useState<string>(teams[0]?.id || '');
   const [selectedTechId, setSelectedTechId] = useState<string>('');
+  const [totalCompViewMode, setTotalCompViewMode] = useState<'slip' | 'summary_table'>('slip');
+  const [selectedTotalCompTechId, setSelectedTotalCompTechId] = useState<string>('');
 
   // Selective printing controls for Overview Report (รายงานภาพรวมทั้งหมด)
   const [overviewSections, setOverviewSections] = useState({
@@ -118,6 +123,15 @@ export const Reports: React.FC<ReportsProps> = ({
             <FileSpreadsheet size={14} />
             <span>รายงานรายการงานทั้งหมด (ตามรอบวันที่)</span>
           </button>
+          <button
+            onClick={() => setReportType('total_compensation')}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
+              reportType === 'total_compensation' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            <Coins size={14} />
+            <span>ค่าตอบแทนรวมรายบุคคล (ใหม่)</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-3">
@@ -154,6 +168,46 @@ export const Reports: React.FC<ReportsProps> = ({
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {reportType === 'total_compensation' && (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-gray-200/70 p-1 rounded-xl">
+                <button
+                  onClick={() => setTotalCompViewMode('slip')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                    totalCompViewMode === 'slip' ? 'bg-white text-gray-900 shadow-2xs' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  สลิปรายบุคคล
+                </button>
+                <button
+                  onClick={() => setTotalCompViewMode('summary_table')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                    totalCompViewMode === 'summary_table' ? 'bg-white text-gray-900 shadow-2xs' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  ตารางสรุปช่างทุกคน
+                </button>
+              </div>
+
+              {totalCompViewMode === 'slip' && (
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs font-bold text-gray-700">เลือกพนักงาน:</label>
+                  <select
+                    className="border border-gray-200 rounded-xl p-1.5 text-xs font-semibold bg-white max-w-[220px]"
+                    value={selectedTotalCompTechId || (allTechs[0]?.id || '')}
+                    onChange={e => setSelectedTotalCompTechId(e.target.value)}
+                  >
+                    {allTechs.map(tech => (
+                      <option key={tech.id} value={tech.id}>
+                        {tech.employeeId ? `[${tech.employeeId}] ` : ''}{tech.officialName} ({tech.teamName})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           )}
 
@@ -579,8 +633,8 @@ export const Reports: React.FC<ReportsProps> = ({
                       <tr key={tech.id} className="bg-transparent text-[11px] md:text-xs">
                         <td className="border border-gray-300 py-1.5 px-2 text-center text-gray-600 font-medium bg-transparent whitespace-nowrap">{idx + 1}</td>
                         <td className="border border-gray-300 py-1.5 px-2 text-center font-mono text-gray-700 bg-transparent whitespace-nowrap">{tech.employeeId || '-'}</td>
-                        <td className="border border-gray-300 py-1.5 px-2 font-bold text-gray-900 bg-transparent whitespace-nowrap">
-                          {getTechOfficialName(tech)}
+                        <td className="border border-gray-300 py-1.5 px-2 font-bold text-gray-900 bg-transparent whitespace-nowrap name-single-line text-[11px] print:text-[7.5pt] leading-tight">
+                          <span className="whitespace-nowrap name-single-line block">{getTechOfficialName(tech)}</span>
                         </td>
                         <td className="border border-gray-300 py-1.5 px-2 text-gray-700 font-medium bg-transparent whitespace-nowrap">{tech.teamName}</td>
                         <td className="border border-gray-300 py-1.5 px-2 text-center font-semibold text-gray-800 bg-transparent whitespace-nowrap">{tech.workDays || 0} วัน</td>
@@ -1319,9 +1373,9 @@ export const Reports: React.FC<ReportsProps> = ({
                             {bIdx === 0 && (
                               <td
                                 rowSpan={techStat.breakdown.length}
-                                className="border border-gray-300 py-1.5 px-2 font-bold text-gray-900 align-top bg-transparent whitespace-nowrap"
+                                className="border border-gray-300 py-1.5 px-2 font-bold text-gray-900 align-top bg-transparent whitespace-nowrap name-single-line text-[11px] print:text-[7.5pt] leading-tight"
                               >
-                                {getTechOfficialName(techStat)}
+                                <span className="whitespace-nowrap name-single-line block">{getTechOfficialName(techStat)}</span>
                               </td>
                             )}
                             {bIdx === 0 && (
@@ -1522,8 +1576,8 @@ export const Reports: React.FC<ReportsProps> = ({
                           <td className="border border-gray-300 py-1.5 px-2 text-center font-bold text-gray-900 bg-transparent">
                             {job.rails}
                           </td>
-                          <td className="border border-gray-300 py-1.5 px-2 text-gray-800 text-[11px] bg-transparent">
-                            {techNames}
+                          <td className="border border-gray-300 py-1.5 px-2 text-gray-800 text-[11px] print:text-[7.5pt] bg-transparent whitespace-nowrap name-single-line">
+                            <span className="whitespace-nowrap name-single-line">{techNames}</span>
                           </td>
                           <td className="border border-gray-300 py-1.5 px-2 text-center bg-transparent">
                             {job.isChecked ? (
@@ -1608,7 +1662,474 @@ export const Reports: React.FC<ReportsProps> = ({
             </div>
           </div>
         )}
+
+        {/* 5. Total Compensation Report (ค่าตอบแทนรวมรายบุคคล - ใหม่) */}
+        {reportType === 'total_compensation' && (() => {
+          const matchingAllowancePeriod = getAllowancePeriodMatchingCurtainPeriod(period);
+
+          // Precompute stats for all technicians
+          const allTechCompensationList = allTechs.map(tech => {
+            const techCurtainStat = calcData.jobTypeAnalytics.byTech.find(t => t.techId === tech.id);
+            const curtainBreakdown = techCurtainStat?.breakdown || [];
+            const curtainInc = techCurtainStat?.totalIncentive || 0;
+            const curtainJobCount = curtainBreakdown.reduce((sum, b) => sum + b.jobCount, 0);
+
+            const acRecords = (otherIncomes || []).filter(
+              r => r.techId === tech.id && r.category === 'ac_install' && r.date >= period.start && r.date <= period.end
+            );
+            const acInc = acRecords.reduce((sum, r) => sum + (r.amount || 0), 0);
+            const acCount = acRecords.length;
+
+            const allowanceRecords = (otherIncomes || []).filter(
+              r => r.techId === tech.id && r.category === 'allowance' && r.date >= matchingAllowancePeriod.start && r.date <= matchingAllowancePeriod.end
+            );
+            const allowanceInc = allowanceRecords.reduce((sum, r) => sum + (r.amount || 0), 0);
+            const allowanceCount = allowanceRecords.length;
+
+            const otherRecords = (otherIncomes || []).filter(
+              r => r.techId === tech.id && r.category === 'other' && r.date >= period.start && r.date <= period.end
+            );
+            const otherInc = otherRecords.reduce((sum, r) => sum + (r.amount || 0), 0);
+            const otherCount = otherRecords.length;
+
+            const totalComp = curtainInc + acInc + allowanceInc + otherInc;
+            const workDays = calcData.individualStats.find(s => s.id === tech.id)?.workDays || 0;
+
+            return {
+              tech,
+              curtainBreakdown,
+              curtainInc,
+              curtainJobCount,
+              acRecords,
+              acInc,
+              acCount,
+              allowanceRecords,
+              allowanceInc,
+              allowanceCount,
+              otherRecords,
+              otherInc,
+              otherCount,
+              totalComp,
+              workDays
+            };
+          });
+
+          const currentTechId = selectedTotalCompTechId || allTechs[0]?.id || '';
+          const currentTechData = allTechCompensationList.find(item => item.tech.id === currentTechId) || allTechCompensationList[0];
+
+          // Compute individual slip table rows
+          const slipRows: {
+            no: number;
+            type: string;
+            count: string;
+            quantity: string;
+            inc: number;
+          }[] = [];
+
+          if (currentTechData) {
+            // 1. Curtain job types
+            currentTechData.curtainBreakdown.forEach(b => {
+              slipRows.push({
+                no: slipRows.length + 1,
+                type: b.label,
+                count: `${b.jobCount} งาน`,
+                quantity: b.totalQuantity > 0 ? `${b.totalQuantity.toLocaleString()} ${b.unitLabel}` : '-',
+                inc: b.totalIncentive
+              });
+            });
+
+            // 2. AC install row (only show if data exists)
+            if (currentTechData.acCount > 0) {
+              slipRows.push({
+                no: slipRows.length + 1,
+                type: 'ค่าติดตั้งแอร์',
+                count: `${currentTechData.acCount} งาน`,
+                quantity: `${currentTechData.acCount} เครื่อง/จุด`,
+                inc: currentTechData.acInc
+              });
+            }
+
+            // 3. Allowance row (only show if data exists)
+            if (currentTechData.allowanceCount > 0) {
+              const upcountryCount = currentTechData.allowanceRecords.filter(r => r.allowanceType === 'upcountry_300' || !r.allowanceType).length;
+              const abroadCount = currentTechData.allowanceRecords.filter(r => r.allowanceType === 'abroad_800').length;
+              let allowanceLabel = 'ค่าเบี้ยเลี้ยง';
+              if (upcountryCount > 0 && abroadCount > 0) {
+                allowanceLabel = `ค่าเบี้ยเลี้ยง (ตจว. 300บ. x ${upcountryCount}, ตปท. 800บ. x ${abroadCount})`;
+              } else if (abroadCount > 0) {
+                allowanceLabel = `ค่าเบี้ยเลี้ยงต่างประเทศ (800 บาท/วัน)`;
+              } else if (upcountryCount > 0) {
+                allowanceLabel = `ค่าเบี้ยเลี้ยงต่างจังหวัด (300 บาท/วัน)`;
+              }
+
+              slipRows.push({
+                no: slipRows.length + 1,
+                type: allowanceLabel,
+                count: `${currentTechData.allowanceCount} วัน`,
+                quantity: `${currentTechData.allowanceCount} วัน (รอบ 21-20)`,
+                inc: currentTechData.allowanceInc
+              });
+            }
+
+            // 4. Other incomes row (only show if data exists)
+            if (currentTechData.otherCount > 0) {
+              const titles = Array.from(new Set(currentTechData.otherRecords.map(r => r.title).filter(Boolean)));
+              const otherLabel = titles.length > 0 ? `ค่าอื่นๆ (${titles.join(', ')})` : 'ค่าอื่นๆ ระบุเอง';
+              slipRows.push({
+                no: slipRows.length + 1,
+                type: otherLabel,
+                count: `${currentTechData.otherCount} รายการ`,
+                quantity: '-',
+                inc: currentTechData.otherInc
+              });
+            }
+          }
+
+          return (
+            <div className="space-y-6">
+              {/* Individual Slip View */}
+              {totalCompViewMode === 'slip' && currentTechData && (
+                <div className="report-scroll-container">
+                  <table className="report-table w-full text-left text-xs border-collapse border border-gray-300 bg-transparent">
+                    <thead>
+                      <tr className="print-header-row">
+                        <th colSpan={5} className="border-none p-0 pb-2 font-normal text-left bg-transparent">
+                          {/* Official PASAYA Header */}
+                          <div className="border-b-2 border-gray-900 pb-2 mb-2">
+                            <table className="w-full border-none border-collapse text-left m-0 p-0 bg-transparent">
+                              <tbody>
+                                <tr>
+                                  <td className="border-none p-0 align-top bg-transparent">
+                                    <table className="border-none border-collapse bg-transparent">
+                                      <tbody>
+                                        <tr>
+                                          <td className="border-none p-0 pr-3 align-middle w-12 bg-transparent">
+                                            <img src={LOGO_URL} alt="PASAYA" className="h-[46px] w-auto object-contain block" />
+                                          </td>
+                                          <td className="border-none p-0 align-middle bg-transparent">
+                                            <h2 className="font-extrabold text-xs md:text-sm text-gray-900 tracking-tight leading-tight">
+                                              บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
+                                            </h2>
+                                            <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
+                                              77/191-192 อาคารสินสาธรทาวเวอร์ ชั้น 42 ถนนกรุงธนบุรี แขวงคลองต้นไทร เขตคลองสาน กรุงเทพฯ 10600 (สํานักงานใหญ่)
+                                            </p>
+                                            <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
+                                              เลขประจําตัวผู้เสียภาษี 0105546015615 โทร: 0-2440-0955 แฟ็กซ์: 0-2440-0933-4
+                                            </p>
+                                          </td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                  </td>
+                                  <td className="border-none p-0 align-top text-right whitespace-nowrap bg-transparent">
+                                    <div className="border border-gray-400 rounded-sm px-2.5 py-1 text-left text-[10.5px] leading-relaxed inline-block bg-transparent print-bordered-box">
+                                      <div>
+                                        <span className="text-gray-600">เลขที่เอกสาร:</span>{' '}
+                                        <strong className="text-gray-900 ml-1">
+                                          TOTAL-INC-{(period?.id || '2026').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}-{currentTechData.tech.id.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}
+                                        </strong>
+                                      </div>
+                                      <div>
+                                        <span className="text-gray-600">วันที่ออกเอกสาร:</span>{' '}
+                                        <strong className="text-gray-900 ml-1">{issueDateStr}</strong>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+
+                            <div className="text-center mt-2 space-y-0.5">
+                              <h1 className="font-black text-base text-gray-900 tracking-tight leading-tight">
+                                เอกสารใบแจ้งค่าตอบแทนรวมรายบุคคล (INDIVIDUAL TOTAL COMPENSATION SLIP)
+                              </h1>
+                              <p className="text-xs font-semibold text-gray-700 leading-tight">
+                                รอบคำนวณผ้าม่าน: <span className="text-gray-900 font-bold">{period?.name || ''}</span> ({formatDateTH(period?.start || '')} ถึง {formatDateTH(period?.end || '')})
+                                <span className="mx-2 text-gray-400">|</span>
+                                รอบคำนวณเบี้ยเลี้ยง (21-20): <span className="text-amber-900 font-bold">{matchingAllowancePeriod.name}</span> ({formatDateTH(matchingAllowancePeriod.start)} ถึง {formatDateTH(matchingAllowancePeriod.end)})
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Tech Info Metrics Header */}
+                          <table className="w-full border border-gray-400 rounded-sm border-collapse text-xs mb-3 bg-transparent print-bordered-box">
+                            <tbody>
+                              <tr>
+                                <td className="border-r border-gray-400 p-2 text-left w-1/3 align-middle bg-transparent">
+                                  {currentTechData.tech.employeeId && (
+                                    <span className="text-[10px] font-mono text-gray-500 block leading-tight">
+                                      รหัสพนักงาน: <strong>{currentTechData.tech.employeeId}</strong>
+                                    </span>
+                                  )}
+                                  <span className="text-gray-600 block text-[10.5px] leading-snug">ชื่อพนักงานช่าง:</span>
+                                  <strong className="text-xs md:text-sm text-gray-900 font-bold block leading-snug whitespace-nowrap name-single-line">
+                                    {currentTechData.tech.officialName}
+                                  </strong>
+                                  <span className="text-gray-500 text-[10px] md:text-[10.5px] block leading-snug">
+                                    (สังกัดทีม: {currentTechData.tech.teamName})
+                                  </span>
+                                </td>
+                                <td className="border-r border-gray-400 p-2 text-center w-1/3 align-middle bg-transparent">
+                                  <span className="text-gray-600 block text-[10.5px] leading-snug">วันปฏิบัติงานผ้าม่าน:</span>
+                                  <strong className="text-xs md:text-sm text-gray-900 font-bold block leading-snug">
+                                    {currentTechData.workDays} วัน
+                                  </strong>
+                                  {currentTechData.allowanceCount > 0 && (
+                                    <span className="text-[10.5px] text-amber-800 font-semibold block leading-snug">
+                                      (เบี้ยเลี้ยง: {currentTechData.allowanceCount} วัน)
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="p-2 text-right w-1/3 align-middle bg-transparent">
+                                  <span className="text-gray-600 block text-[10.5px] leading-snug">รวมค่าตอบแทนสุทธิทั้งสิ้น:</span>
+                                  <strong className="text-sm md:text-base text-emerald-800 font-black block leading-snug">
+                                    ฿{Math.round(currentTechData.totalComp).toLocaleString()}
+                                  </strong>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </th>
+                      </tr>
+
+                      {/* 5 Requested Columns */}
+                      <tr className="text-gray-900 font-bold border-b border-gray-400 table-column-header bg-transparent text-[11px] md:text-xs">
+                        <th className="border border-gray-300 py-2 px-3 text-center w-12 whitespace-nowrap bg-transparent">ลำดับ</th>
+                        <th className="border border-gray-300 py-2 px-3 text-left whitespace-nowrap bg-transparent">ประเภทงาน</th>
+                        <th className="border border-gray-300 py-2 px-3 text-center w-28 whitespace-nowrap bg-transparent">จำนวนงาน</th>
+                        <th className="border border-gray-300 py-2 px-3 text-center w-36 whitespace-nowrap bg-transparent">ปริมาณรวม</th>
+                        <th className="border border-gray-300 py-2 px-3 text-right w-44 whitespace-nowrap bg-transparent">ค่า Incentive (บาท)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-transparent">
+                      {slipRows.map((r, rIdx) => (
+                        <tr key={rIdx} className="bg-transparent text-[11px] md:text-xs hover:bg-gray-50/50">
+                          <td className="border border-gray-300 py-2 px-3 text-center text-gray-600 font-medium bg-transparent whitespace-nowrap">
+                            {r.no}
+                          </td>
+                          <td className="border border-gray-300 py-2 px-3 font-bold text-gray-900 bg-transparent">
+                            {r.type}
+                          </td>
+                          <td className="border border-gray-300 py-2 px-3 text-center font-semibold text-gray-800 bg-transparent whitespace-nowrap">
+                            {r.count}
+                          </td>
+                          <td className="border border-gray-300 py-2 px-3 text-center font-bold text-gray-900 bg-transparent whitespace-nowrap">
+                            {r.quantity}
+                          </td>
+                          <td className="border border-gray-300 py-2 px-3 text-right font-black text-gray-900 bg-transparent whitespace-nowrap">
+                            ฿{Math.round(r.inc).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+
+                      {slipRows.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="py-8 text-center text-gray-400 bg-transparent">
+                            ไม่มีรายการค่าตอบแทนสำหรับช่างท่านนี้ในรอบคำนวณที่เลือก
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                    <tfoot className="bg-transparent font-bold border-t-2 border-gray-400">
+                      <tr>
+                        <td colSpan={2} className="border border-gray-300 py-2.5 px-3 text-right font-black text-gray-900 bg-transparent">
+                          รวมยอดค่าตอบแทนสุทธิทั้งสิ้น
+                        </td>
+                        <td className="border border-gray-300 py-2.5 px-3 text-center text-blue-900 font-black bg-transparent">
+                          {currentTechData.curtainJobCount + currentTechData.acCount + currentTechData.allowanceCount + currentTechData.otherCount} รายการ
+                        </td>
+                        <td className="border border-gray-300 py-2.5 px-3 bg-transparent"></td>
+                        <td className="border border-gray-300 py-2.5 px-3 text-right text-emerald-800 font-black text-base bg-transparent">
+                          ฿{Math.round(currentTechData.totalComp).toLocaleString()}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+
+                  {/* Official Sign-off Approval Block */}
+                  <div className="mt-6 pt-3 border-t border-gray-300 text-xs text-gray-800 print-signature-block">
+                    <div className="font-bold text-center mb-2.5 text-gray-900 text-xs tracking-wider uppercase">
+                      ช่องทางลงนามและอนุมัติ (OFFICIAL SIGN-OFF & APPROVAL)
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                      <div className="flex flex-col justify-between min-h-[90px]">
+                        <div className="h-11 md:h-12 w-full"></div>
+                        <div>
+                          <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                          <p className="text-[11px] text-gray-700 font-semibold mt-1">ลายมือชื่อพนักงานผู้รับเงิน / Employee Signature</p>
+                          <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col justify-between min-h-[90px]">
+                        <div className="h-11 md:h-12 w-full"></div>
+                        <div>
+                          <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                          <p className="text-[11px] text-gray-700 font-semibold mt-1">พนักงานตรวจสอบ / Checked By</p>
+                          <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col justify-between min-h-[90px]">
+                        <div className="h-11 md:h-12 w-full"></div>
+                        <div>
+                          <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                          <p className="text-[11px] text-gray-700 font-semibold mt-1">ผู้จัดการแผนก / Dept Manager</p>
+                          <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col justify-between min-h-[90px]">
+                        <div className="h-11 md:h-12 w-full"></div>
+                        <div>
+                          <p className="font-bold text-gray-900 tracking-wider">(........................................................)</p>
+                          <p className="text-[11px] text-gray-700 font-semibold mt-1">ผู้อนุมัติจ่าย / Authorized Signatory</p>
+                          <p className="text-[10px] text-gray-500 mt-0.5">วันที่ ........ / ........ / .............</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* All Technicians Summary Table View */}
+              {totalCompViewMode === 'summary_table' && (
+                <div className="report-scroll-container">
+                  <table className="report-table w-full text-left text-xs border-collapse border border-gray-300 bg-transparent">
+                    <thead>
+                      <tr className="print-header-row">
+                        <th colSpan={10} className="border-none p-0 pb-2 font-normal text-left bg-transparent">
+                          <div className="border-b-2 border-gray-900 pb-2 mb-2">
+                            <table className="w-full border-none border-collapse text-left m-0 p-0 bg-transparent">
+                              <tbody>
+                                <tr>
+                                  <td className="border-none p-0 align-top bg-transparent">
+                                    <table className="border-none border-collapse bg-transparent">
+                                      <tbody>
+                                        <tr>
+                                          <td className="border-none p-0 pr-3 align-middle w-12 bg-transparent">
+                                            <img src={LOGO_URL} alt="PASAYA" className="h-[46px] w-auto object-contain block" />
+                                          </td>
+                                          <td className="border-none p-0 align-middle bg-transparent">
+                                            <h2 className="font-extrabold text-xs md:text-sm text-gray-900 tracking-tight leading-tight">
+                                              บริษัท เท็กซ์ไทล์ แกลลอรี่ จํากัด
+                                            </h2>
+                                            <p className="text-[10.5px] text-gray-800 font-medium leading-tight whitespace-nowrap">
+                                              77/191-192 อาคารสินสาธรทาวเวอร์ ชั้น 42 ถนนกรุงธนบุรี แขวงคลองต้นไทร เขตคลองสาน กรุงเทพฯ 10600
+                                            </p>
+                                          </td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                  </td>
+                                  <td className="border-none p-0 align-top text-right whitespace-nowrap bg-transparent">
+                                    <div className="border border-gray-400 rounded-sm px-2.5 py-1 text-left text-[10.5px] leading-relaxed inline-block bg-transparent print-bordered-box">
+                                      <div><span className="text-gray-600">วันที่พิมพ์:</span> <strong className="text-gray-900 ml-1">{issueDateStr}</strong></div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+
+                            <div className="text-center mt-2 space-y-0.5">
+                              <h1 className="font-black text-base text-gray-900 tracking-tight leading-tight">
+                                ตารางสรุปค่าตอบแทนรวมรายบุคคล (TOTAL INDIVIDUAL COMPENSATION SUMMARY)
+                              </h1>
+                              <p className="text-xs font-semibold text-gray-700 leading-tight">
+                                รอบคำนวณผ้าม่าน: <span className="text-gray-900 font-bold">{period?.name || ''}</span> ({formatDateTH(period?.start || '')} ถึง {formatDateTH(period?.end || '')})
+                                <span className="mx-2 text-gray-400">|</span>
+                                รอบคำนวณเบี้ยเลี้ยง (21-20): <span className="text-amber-900 font-bold">{matchingAllowancePeriod.name}</span> ({formatDateTH(matchingAllowancePeriod.start)} ถึง {formatDateTH(matchingAllowancePeriod.end)})
+                              </p>
+                            </div>
+                          </div>
+                        </th>
+                      </tr>
+
+                      <tr className="text-gray-900 font-bold border-b border-gray-400 table-column-header bg-transparent text-[11px] md:text-xs">
+                        <th className="border border-gray-300 py-1.5 px-2 text-center w-10 whitespace-nowrap bg-transparent">ลำดับ</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-center w-20 whitespace-nowrap bg-transparent">รหัสพนักงาน</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-left whitespace-nowrap bg-transparent">ชื่อ-นามสกุล</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-left w-28 whitespace-nowrap bg-transparent">สังกัดทีม</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-right w-28 whitespace-nowrap bg-transparent">ค่าผ้าม่าน (บาท)</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-right w-28 whitespace-nowrap bg-transparent">ค่าเบี้ยเลี้ยง (21-20)</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-right w-28 whitespace-nowrap bg-transparent">ค่าติดตั้งแอร์ (บาท)</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-right w-24 whitespace-nowrap bg-transparent">ค่าอื่นๆ (บาท)</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-right w-32 whitespace-nowrap bg-transparent">รวมสุทธิ (บาท)</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-center w-20 whitespace-nowrap bg-transparent no-print">จัดการ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-transparent">
+                      {allTechCompensationList.map((item, idx) => (
+                        <tr key={item.tech.id} className="bg-transparent text-[11px] md:text-xs hover:bg-gray-50/60">
+                          <td className="border border-gray-300 py-1.5 px-2 text-center text-gray-600 font-medium bg-transparent whitespace-nowrap">
+                            {idx + 1}
+                          </td>
+                          <td className="border border-gray-300 py-1.5 px-2 text-center font-mono text-gray-700 bg-transparent whitespace-nowrap">
+                            {item.tech.employeeId || '-'}
+                          </td>
+                          <td className="border border-gray-300 py-1.5 px-2 font-bold text-gray-900 bg-transparent whitespace-nowrap name-single-line text-[11px] print:text-[7.5pt] leading-tight">
+                            <span className="whitespace-nowrap name-single-line block">{item.tech.officialName}</span>
+                          </td>
+                          <td className="border border-gray-300 py-1.5 px-2 text-gray-700 font-medium bg-transparent whitespace-nowrap">
+                            {item.tech.teamName}
+                          </td>
+                          <td className="border border-gray-300 py-1.5 px-2 text-right font-semibold text-gray-900 bg-transparent whitespace-nowrap">
+                            ฿{Math.round(item.curtainInc).toLocaleString()}
+                          </td>
+                          <td className="border border-gray-300 py-1.5 px-2 text-right font-semibold text-amber-900 bg-transparent whitespace-nowrap">
+                            {item.allowanceInc > 0 ? `฿${Math.round(item.allowanceInc).toLocaleString()} (${item.allowanceCount}ว)` : '-'}
+                          </td>
+                          <td className="border border-gray-300 py-1.5 px-2 text-right font-semibold text-blue-900 bg-transparent whitespace-nowrap">
+                            {item.acInc > 0 ? `฿${Math.round(item.acInc).toLocaleString()}` : '-'}
+                          </td>
+                          <td className="border border-gray-300 py-1.5 px-2 text-right font-semibold text-purple-900 bg-transparent whitespace-nowrap">
+                            {item.otherInc > 0 ? `฿${Math.round(item.otherInc).toLocaleString()}` : '-'}
+                          </td>
+                          <td className="border border-gray-300 py-1.5 px-2 text-right font-black text-emerald-800 bg-transparent whitespace-nowrap">
+                            ฿{Math.round(item.totalComp).toLocaleString()}
+                          </td>
+                          <td className="border border-gray-300 py-1.5 px-2 text-center bg-transparent no-print">
+                            <button
+                              onClick={() => {
+                                setSelectedTotalCompTechId(item.tech.id);
+                                setTotalCompViewMode('slip');
+                              }}
+                              className="px-2 py-0.5 text-[10.5px] font-bold text-amber-700 hover:text-amber-900 hover:bg-amber-50 rounded-lg transition-colors border border-amber-200 cursor-pointer"
+                            >
+                              ดูสลิป
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="font-bold border-t-2 border-gray-400 bg-transparent">
+                      <tr>
+                        <td colSpan={4} className="border border-gray-300 py-2 px-2 text-right font-black text-gray-900 bg-transparent">
+                          รวมค่าตอบแทนพนักงานทั้งหมด ({allTechCompensationList.length} คน):
+                        </td>
+                        <td className="border border-gray-300 py-2 px-2 text-right text-gray-900 font-black bg-transparent">
+                          ฿{Math.round(allTechCompensationList.reduce((s, i) => s + i.curtainInc, 0)).toLocaleString()}
+                        </td>
+                        <td className="border border-gray-300 py-2 px-2 text-right text-amber-900 font-black bg-transparent">
+                          ฿{Math.round(allTechCompensationList.reduce((s, i) => s + i.allowanceInc, 0)).toLocaleString()}
+                        </td>
+                        <td className="border border-gray-300 py-2 px-2 text-right text-blue-900 font-black bg-transparent">
+                          ฿{Math.round(allTechCompensationList.reduce((s, i) => s + i.acInc, 0)).toLocaleString()}
+                        </td>
+                        <td className="border border-gray-300 py-2 px-2 text-right text-purple-900 font-black bg-transparent">
+                          ฿{Math.round(allTechCompensationList.reduce((s, i) => s + i.otherInc, 0)).toLocaleString()}
+                        </td>
+                        <td className="border border-gray-300 py-2 px-2 text-right text-emerald-800 font-black text-sm bg-transparent">
+                          ฿{Math.round(allTechCompensationList.reduce((s, i) => s + i.totalComp, 0)).toLocaleString()}
+                        </td>
+                        <td className="border border-gray-300 bg-transparent no-print"></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
 };
+

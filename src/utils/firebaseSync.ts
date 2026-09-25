@@ -1,6 +1,6 @@
 import { doc, onSnapshot, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Team, Job, LeaveRecord, PayPeriod, IncentiveRules, AppUser, AutoBackupConfig, BackupInterval } from '../types';
+import { Team, Job, LeaveRecord, PayPeriod, IncentiveRules, AppUser, AutoBackupConfig, BackupInterval, OtherIncomeRecord } from '../types';
 import { INITIAL_TEAMS, getInitialJobs, getInitialLeaves, getInitialHolidays, DEFAULT_INCENTIVE_RULES, DEFAULT_USERS } from '../data/initialData';
 import { getCurrentAutoPeriod, generateAutoPeriodsList } from './periodUtils';
 
@@ -13,6 +13,7 @@ export interface AppFirebaseData {
   savedPeriods: PayPeriod[];
   rules: IncentiveRules;
   appUsers: AppUser[];
+  otherIncomes?: OtherIncomeRecord[];
   themeColor?: string;
   autoBackupConfig?: AutoBackupConfig;
   updatedAt?: number;
@@ -68,7 +69,12 @@ export function subscribeToRealtimeData(
       }
     },
     (err) => {
-      console.error('Firestore realtime listener error:', err);
+      const isUnavailable = err?.code === 'unavailable' || String(err?.message || '').includes('unavailable');
+      if (isUnavailable) {
+        console.warn('Firestore is temporarily operating in offline mode. Local cache and storage remain active and will automatically synchronize when reconnected.');
+      } else {
+        console.error('Firestore realtime listener error:', err);
+      }
       if (onError) onError(err);
     }
   );
@@ -138,6 +144,8 @@ export async function saveToRealtimeDb(partialData: Partial<AppFirebaseData>): P
         isQuotaExceeded = true;
         quotaExceededCooldownUntil = Date.now() + 15 * 60 * 1000; // 15-minute cooldown
         console.warn('Firestore write quota reached. Changes are safely preserved in local storage.');
+      } else if (errCode === 'unavailable' || errMsg.includes('unavailable') || errMsg.includes('Could not reach Cloud Firestore backend')) {
+        console.warn('Firestore backend temporarily unreachable. Updates queued in local storage and will sync upon connection.');
       } else {
         console.error('Error saving to Firestore:', err);
       }

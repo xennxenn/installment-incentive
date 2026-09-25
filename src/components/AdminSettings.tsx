@@ -71,6 +71,13 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   const [snapshotFilter, setSnapshotFilter] = useState<'all' | 'auto_hourly' | 'auto_daily' | 'auto_weekly' | 'safety' | 'manual'>('all');
   const [snapshotSearch, setSnapshotSearch] = useState('');
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string;
+    message: string;
+    confirmText?: string;
+    isDanger?: boolean;
+    onConfirm: () => void | Promise<void>;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const showStatus = (text: string, type: 'success' | 'error' = 'success') => {
@@ -105,51 +112,63 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     }
   };
 
-  const handleDeleteSnapshotClick = async (snapshot: SnapshotSummary) => {
+  const handleDeleteSnapshotClick = (snapshot: SnapshotSummary) => {
     if (!onDeleteSnapshot) return;
-    if (!window.confirm(`ยืนยันการลบจุดสำรองข้อมูล:\n"${snapshot.label}"\nวันที่: ${snapshot.dateStr}\n\nการลบจุดสำรองนี้จะไม่กระทบกับข้อมูลปัจจุบันในระบบ ยืนยันหรือไม่?`)) {
-      return;
-    }
-    try {
-      await onDeleteSnapshot(snapshot.id);
-      showStatus(`ลบจุดสำรอง "${snapshot.label}" เรียบร้อย`);
-    } catch (err: any) {
-      showStatus('ไม่สามารถลบจุดสำรองได้: ' + (err?.message || ''), 'error');
-    }
+    setConfirmModal({
+      title: 'ยืนยันการลบจุดสำรองข้อมูล',
+      message: `คุณต้องการลบจุดสำรองข้อมูล "${snapshot.label}" (${snapshot.dateStr}) ใช่หรือไม่? การลบจุดสำรองนี้จะไม่กระทบกับข้อมูลปัจจุบันในระบบ`,
+      confirmText: 'ยืนยันลบจุดสำรอง',
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          await onDeleteSnapshot(snapshot.id);
+          showStatus(`ลบจุดสำรอง "${snapshot.label}" เรียบร้อย`);
+        } catch (err: any) {
+          showStatus('ไม่สามารถลบจุดสำรองได้: ' + (err?.message || ''), 'error');
+        }
+      }
+    });
   };
 
-  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!window.confirm(`ยืนยันการนำเข้าและกู้คืนข้อมูลจากไฟล์ "${file.name}" ใช่หรือไม่?\nข้อมูลที่มีอยู่ในระบบจะถูกแทนที่ด้วยข้อมูลจากไฟล์สำรองนี้`)) {
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
-    setIsImporting(true);
-    try {
-      await onImportBackupJSON(file);
-      showStatus('กู้คืนข้อมูลจากไฟล์ JSON สำเร็จเรียบร้อย');
-    } catch (err: any) {
-      showStatus('เกิดข้อผิดพลาดในการกู้คืนไฟล์: ' + (err?.message || ''), 'error');
-    } finally {
-      setIsImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
+    setConfirmModal({
+      title: 'ยืนยันการนำเข้าและกู้คืนข้อมูล',
+      message: `ยืนยันการนำเข้าและกู้คืนข้อมูลจากไฟล์ "${file.name}" ใช่หรือไม่?\nข้อมูลที่มีอยู่ในระบบจะถูกแทนที่ด้วยข้อมูลจากไฟล์สำรองนี้`,
+      confirmText: 'ยืนยันนำเข้าข้อมูล',
+      isDanger: true,
+      onConfirm: async () => {
+        setIsImporting(true);
+        try {
+          await onImportBackupJSON(file);
+          showStatus('กู้คืนข้อมูลจากไฟล์ JSON สำเร็จเรียบร้อย');
+        } catch (err: any) {
+          showStatus('เกิดข้อผิดพลาดในการกู้คืนไฟล์: ' + (err?.message || ''), 'error');
+        } finally {
+          setIsImporting(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+      }
+    });
   };
 
-  const handleRestoreClick = async (snapshot: SnapshotSummary) => {
-    if (!window.confirm(`ยืนยันการกู้คืนข้อมูลย้อนกลับไปยัง:\n"${snapshot.label}"\nวันที่สำรอง: ${snapshot.dateStr}\n(ข้อมูลงาน: ${snapshot.jobsCount} รายการ, ทีมช่าง: ${snapshot.teamsCount} ทีม)\n\nระบบจะสร้างจุดสำรองความปลอดภัยของข้อมูลปัจจุบันให้ก่อนเสมอ แล้วจึงกู้คืนข้อมูลชุดนี้ขึ้น Cloud ทันที`)) {
-      return;
-    }
-
-    try {
-      await onRestoreSnapshot(snapshot.id);
-      showStatus(`กู้คืนข้อมูลย้อนกลับไปยังจุด "${snapshot.label}" (${snapshot.dateStr}) สำเร็จ`);
-    } catch (err: any) {
-      showStatus('ไม่สามารถกู้คืนข้อมูลได้: ' + (err?.message || ''), 'error');
-    }
+  const handleRestoreClick = (snapshot: SnapshotSummary) => {
+    setConfirmModal({
+      title: 'ยืนยันการกู้คืนข้อมูลย้อนกลับ',
+      message: `ยืนยันการกู้คืนข้อมูลย้อนกลับไปยัง "${snapshot.label}" (วันที่สำรอง: ${snapshot.dateStr})\n(ข้อมูลงาน: ${snapshot.jobsCount} รายการ, ทีมช่าง: ${snapshot.teamsCount} ทีม)\n\nระบบจะสร้างจุดสำรองความปลอดภัยของข้อมูลปัจจุบันให้ก่อนเสมอ แล้วจึงกู้คืนข้อมูลชุดนี้ขึ้น Cloud ทันที`,
+      confirmText: 'ยืนยันกู้คืนข้อมูล',
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          await onRestoreSnapshot(snapshot.id);
+          showStatus(`กู้คืนข้อมูลย้อนกลับไปยังจุด "${snapshot.label}" (${snapshot.dateStr}) สำเร็จ`);
+        } catch (err: any) {
+          showStatus('ไม่สามารถกู้คืนข้อมูลได้: ' + (err?.message || ''), 'error');
+        }
+      }
+    });
   };
 
   const getBackupTypeBadge = (type?: string) => {
@@ -828,6 +847,54 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Confirmation Modal (In-App Dialog, immune to iframe alert/confirm blockage) */}
+      {confirmModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-gray-100 animate-in fade-in duration-150">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                  confirmModal.isDanger ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'
+                }`}>
+                  <AlertCircle size={24} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">{confirmModal.title}</h3>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-600 mb-5 whitespace-pre-line leading-relaxed">
+                {confirmModal.message}
+              </p>
+
+              <div className="flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setConfirmModal(null)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const cb = confirmModal.onConfirm;
+                    setConfirmModal(null);
+                    await cb();
+                  }}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm transition-colors flex items-center gap-1.5 ${
+                    confirmModal.isDanger ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+                >
+                  <Check size={14} />
+                  <span>{confirmModal.confirmText || 'ยืนยัน'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -110,9 +110,24 @@
   /* Ensure names and critical cells stay strictly on 1 line when printed */
   .report-table th.whitespace-nowrap,
   .report-table td.whitespace-nowrap,
-  .report-table .whitespace-nowrap {
+  .report-table .whitespace-nowrap,
+  .name-single-line,
+  td.name-single-line,
+  th.name-single-line,
+  span.name-single-line {
     white-space: nowrap !important;
     word-break: keep-all !important;
+  }
+
+  .name-single-line,
+  td.name-single-line,
+  span.name-single-line {
+    font-size: 7.5pt !important;
+    letter-spacing: -0.02em !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    max-width: none !important;
+    line-height: 1.15 !important;
   }
 
   .print-header-row,
@@ -168,6 +183,11 @@
   max-height: calc(100vh - 160px);
   overflow-y: auto;
   overflow-x: auto;
+}
+
+.name-single-line {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
 }
 
 

@@ -83,3 +83,85 @@ export function generateAutoPeriodsList(refDate: Date = new Date(), countBefore 
 
   return periods;
 }
+
+export interface AllowancePeriod {
+  id: string;
+  name: string;
+  start: string; // YYYY-MM-DD
+  end: string;   // YYYY-MM-DD
+  year: number;
+  monthIndex: number; // 0-indexed
+  monthName: string;
+}
+
+/**
+ * Returns the allowance calculation cycle (21st of prev month to 20th of target month).
+ * Example: year = 2026, monthIndex = 8 (กันยายน)
+ * Start: 2026-08-21
+ * End: 2026-09-20
+ * Name: "รอบเดือนกันยายน 2026"
+ */
+export function getAllowancePeriodForMonth(year: number, monthIndex: number): AllowancePeriod {
+  const prevMonthIndex = monthIndex === 0 ? 11 : monthIndex - 1;
+  const prevYear = monthIndex === 0 ? year - 1 : year;
+
+  const startStr = `${prevYear}-${String(prevMonthIndex + 1).padStart(2, '0')}-21`;
+  const endStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-20`;
+  const monthName = THAI_MONTHS[monthIndex];
+
+  return {
+    id: `allowance-${year}-${String(monthIndex + 1).padStart(2, '0')}`,
+    name: `รอบเดือน${monthName} ${year}`,
+    start: startStr,
+    end: endStr,
+    year,
+    monthIndex,
+    monthName
+  };
+}
+
+/**
+ * Finds which 21st-20th allowance period a given date belongs to.
+ * Example 1: 2026-08-21 -> belongs to September 2026 (2026-08-21 to 2026-09-20)
+ * Example 2: 2026-09-20 -> belongs to September 2026
+ * Example 3: 2026-09-21 -> belongs to October 2026
+ */
+export function getAllowancePeriodForDate(dateStr: string): AllowancePeriod {
+  if (!dateStr || dateStr.length < 10) {
+    const now = new Date();
+    return getAllowancePeriodForMonth(now.getFullYear(), now.getMonth());
+  }
+
+  const parts = dateStr.split('-');
+  let y = parseInt(parts[0], 10);
+  let m = parseInt(parts[1], 10) - 1; // 0-indexed
+  const d = parseInt(parts[2], 10);
+
+  if (d >= 21) {
+    m += 1;
+    if (m > 11) {
+      m = 0;
+      y += 1;
+    }
+  }
+
+  return getAllowancePeriodForMonth(y, m);
+}
+
+/**
+ * Resolves the corresponding allowance period for a curtain pay period.
+ * Uses the month of curtainPeriod.end as the anchor.
+ * Example: Curtain period ending in Sep 2026 (e.g. 2026-09-15) -> Allowance period 2026-08-21 to 2026-09-20 (Sep 2026).
+ */
+export function getAllowancePeriodMatchingCurtainPeriod(curtainPeriod?: PayPeriod): AllowancePeriod {
+  if (!curtainPeriod || !curtainPeriod.end) {
+    const now = new Date();
+    return getAllowancePeriodForMonth(now.getFullYear(), now.getMonth());
+  }
+
+  const parts = curtainPeriod.end.split('-');
+  const y = parseInt(parts[0], 10) || new Date().getFullYear();
+  const m = (parseInt(parts[1], 10) || (new Date().getMonth() + 1)) - 1;
+
+  return getAllowancePeriodForMonth(y, m);
+}
