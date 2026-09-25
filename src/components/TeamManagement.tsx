@@ -51,6 +51,8 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
 
   const [addingMemberTo, setAddingMemberTo] = useState<string | null>(null);
   const [newMember, setNewMember] = useState({
+    employeeId: '',
+    fullName: '',
     name: '',
     joinDate: new Date().toISOString().split('T')[0],
     resignDate: ''
@@ -59,7 +61,13 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
   const [editingMember, setEditingMember] = useState<{
     teamId: string;
     memberId: string;
-    data: { name: string; joinDate: string; resignDate: string };
+    data: {
+      employeeId?: string;
+      fullName?: string;
+      name: string;
+      joinDate: string;
+      resignDate: string;
+    };
   } | null>(null);
 
   const [transferringMember, setTransferringMember] = useState<{
@@ -207,21 +215,35 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
   };
 
   const handleCreateMember = (teamId: string) => {
-    if ((newMember?.name || '').trim()) {
+    const rawName = (newMember?.name || '').trim();
+    const rawFullName = (newMember?.fullName || '').trim();
+    const rawEmpId = (newMember?.employeeId || '').trim();
+    const systemName = rawName || rawFullName;
+    if (systemName) {
       onAddMember(teamId, {
-        name: (newMember?.name || '').trim(),
+        name: systemName,
+        employeeId: rawEmpId || undefined,
+        fullName: rawFullName || undefined,
         joinDate: newMember.joinDate || new Date().toISOString().split('T')[0],
         resignDate: newMember.resignDate || undefined
       });
       setAddingMemberTo(null);
-      setNewMember({ name: '', joinDate: new Date().toISOString().split('T')[0], resignDate: '' });
+      setNewMember({ employeeId: '', fullName: '', name: '', joinDate: new Date().toISOString().split('T')[0], resignDate: '' });
     }
   };
 
   const handleSaveMemberEdit = () => {
-    if (editingMember && (editingMember.data?.name || '').trim()) {
+    if (editingMember) {
+      const rawName = (editingMember.data?.name || '').trim();
+      const rawFullName = (editingMember.data?.fullName || '').trim();
+      const rawEmpId = (editingMember.data?.employeeId || '').trim();
+      const systemName = rawName || rawFullName;
+      if (!systemName) return;
+
       onUpdateMember(editingMember.teamId, editingMember.memberId, {
-        name: (editingMember.data?.name || '').trim(),
+        name: systemName,
+        employeeId: rawEmpId || undefined,
+        fullName: rawFullName || undefined,
         joinDate: editingMember.data.joinDate,
         resignDate: editingMember.data.resignDate || undefined
       });
@@ -514,17 +536,57 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                             )}
                           </div>
 
-                          <input
-                            className="w-full border rounded-lg p-1.5 font-bold text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
-                            placeholder="ชื่อช่างติดตั้ง"
-                            value={editingMember.data?.name || ''}
-                            onChange={e =>
-                              setEditingMember({
-                                ...editingMember,
-                                data: { ...editingMember.data, name: e.target.value }
-                              })
-                            }
-                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] font-bold text-gray-700 block mb-0.5">
+                                1. รหัสพนักงาน:
+                              </label>
+                              <input
+                                className="w-full border rounded-lg p-1.5 font-mono text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                placeholder="เช่น EMP-001"
+                                value={editingMember.data?.employeeId || ''}
+                                onChange={e =>
+                                  setEditingMember({
+                                    ...editingMember,
+                                    data: { ...editingMember.data, employeeId: e.target.value }
+                                  })
+                                }
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-gray-700 block mb-0.5">
+                                ชื่อในระบบบันทึกงาน: <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                className="w-full border rounded-lg p-1.5 font-bold text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                placeholder="เช่น ช่างนาย"
+                                value={editingMember.data?.name || ''}
+                                onChange={e =>
+                                  setEditingMember({
+                                    ...editingMember,
+                                    data: { ...editingMember.data, name: e.target.value }
+                                  })
+                                }
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold text-gray-700 block mb-0.5">
+                              2. ชื่อจริง (ชื่อเล่น) นามสกุล:
+                            </label>
+                            <input
+                              className="w-full border rounded-lg p-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-400 font-medium"
+                              placeholder="เช่น สมชาย (นาย) ใจกล้า (ใช้แสดงในหน้ารายงาน)"
+                              value={editingMember.data?.fullName || ''}
+                              onChange={e =>
+                                setEditingMember({
+                                  ...editingMember,
+                                  data: { ...editingMember.data, fullName: e.target.value }
+                                })
+                              }
+                            />
+                          </div>
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <span className="text-[10px] font-bold text-gray-600 block">
@@ -602,9 +664,19 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                         <div className="flex justify-between items-center gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
+                              {member.employeeId && (
+                                <span className="font-mono text-[10px] font-bold bg-gray-200/90 text-gray-700 px-1.5 py-0.5 rounded border border-gray-300">
+                                  {member.employeeId}
+                                </span>
+                              )}
                               <span className={`font-bold ${member.resignDate ? 'text-gray-500' : 'text-gray-900'}`}>
-                                {member?.name || ''}
+                                {member.fullName || member?.name || ''}
                               </span>
+                              {member.fullName && member.name && (
+                                <span className="text-[10px] text-gray-400 font-normal">
+                                  (ชื่อในระบบ: <span className="font-semibold text-gray-600">{member.name}</span>)
+                                </span>
+                              )}
                               {linked?.type === 'transferred_out' && (
                                 <span
                                   className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-0.5"
@@ -769,6 +841,8 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                                   teamId: team.id,
                                   memberId: member.id,
                                   data: {
+                                    employeeId: member?.employeeId || '',
+                                    fullName: member?.fullName || '',
                                     name: member?.name || '',
                                     joinDate: member?.joinDate || '',
                                     resignDate: member?.resignDate || ''
@@ -799,12 +873,46 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
             {/* Add member box */}
             {addingMemberTo === team.id ? (
               <div className="bg-gray-50 border border-gray-200 p-3 rounded-xl space-y-2 text-xs">
-                <input
-                  placeholder="ชื่อช่างติดตั้ง"
-                  className="w-full border rounded-lg p-1.5 font-semibold text-xs bg-white"
-                  value={newMember?.name || ''}
-                  onChange={e => setNewMember({ ...newMember, name: e.target.value })}
-                />
+                <div className="font-bold text-[11px] text-gray-700">
+                  เพิ่มข้อมูลช่างในทีม
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-600 block mb-0.5">
+                      1. รหัสพนักงาน:
+                    </label>
+                    <input
+                      placeholder="เช่น EMP-001"
+                      className="w-full border rounded-lg p-1.5 font-mono text-xs bg-white"
+                      value={newMember?.employeeId || ''}
+                      onChange={e => setNewMember({ ...newMember, employeeId: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-600 block mb-0.5">
+                      ชื่อช่างในระบบ: <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      placeholder="เช่น ช่างนาย"
+                      className="w-full border rounded-lg p-1.5 font-bold text-xs bg-white"
+                      value={newMember?.name || ''}
+                      onChange={e => setNewMember({ ...newMember, name: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">
+                    2. ชื่อจริง (ชื่อเล่น) นามสกุล:
+                  </label>
+                  <input
+                    placeholder="เช่น สมชาย (นาย) ใจกล้า (ใช้แสดงในหน้ารายงาน)"
+                    className="w-full border rounded-lg p-1.5 text-xs bg-white font-medium"
+                    value={newMember?.fullName || ''}
+                    onChange={e => setNewMember({ ...newMember, fullName: e.target.value })}
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <span className="text-[10px] font-bold text-gray-400 block">วันเริ่มงาน:</span>

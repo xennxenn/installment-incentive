@@ -227,7 +227,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <thead className="bg-gray-50 text-gray-500 font-semibold sticky top-0 border-b border-gray-200">
                   <tr>
                     <th className="p-2.5 text-center w-8">#</th>
-                    <th className="p-2.5 text-left">ชื่อช่าง</th>
+                    <th className="p-2.5 text-left w-20">รหัส</th>
+                    <th className="p-2.5 text-left">ชื่อจริง (ชื่อเล่น) นามสกุล</th>
                     <th className="p-2.5 text-left">สังกัดทีม</th>
                     <th className="p-2.5 text-center">วันทำงาน</th>
                     <th className="p-2.5 text-right">Incentive สะสม</th>
@@ -244,7 +245,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           {idx === 2 && <span className="text-amber-700">🥉</span>}
                           {!isTop3 && <span className="text-gray-400">{idx + 1}</span>}
                         </td>
-                        <td className="p-2.5 font-bold text-gray-800">{tech.name || ''}</td>
+                        <td className="p-2.5 font-mono text-[11px] text-gray-500">{tech.employeeId || '-'}</td>
+                        <td className="p-2.5 font-bold text-gray-800">{tech.fullName || tech.name || ''}</td>
                         <td className="p-2.5 text-gray-500">{tech.teamName || ''}</td>
                         <td className="p-2.5 text-center font-medium text-gray-700">{tech.workDays || 0} วัน</td>
                         <td className="p-2.5 text-right font-extrabold text-emerald-600">
@@ -256,7 +258,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                   {(!calcData?.individualStats || calcData.individualStats.length === 0) && (
                     <tr>
-                      <td colSpan={5} className="text-center py-6 text-gray-400">
+                      <td colSpan={6} className="text-center py-6 text-gray-400">
                         ยังไม่มีข้อมูลช่างในรอบนี้
                       </td>
                     </tr>

@@ -224,7 +224,12 @@ export const CalendarLeave: React.FC<CalendarLeaveProps> = ({
                 <tr key={`${member.id}-${idx}`} className="hover:bg-gray-50/80 transition-colors">
                   <td className="py-2 px-2 sticky left-0 bg-white border-r border-gray-100 font-bold text-gray-800 z-10 shadow-[1px_0_2px_rgba(0,0,0,0.03)]">
                     <div className="flex items-center gap-1 flex-wrap">
-                      <span>{member?.name || ''}</span>
+                      {member.employeeId && (
+                        <span className="font-mono text-[9px] font-bold bg-gray-100 text-gray-600 px-1 py-0.2 rounded border border-gray-200">
+                          {member.employeeId}
+                        </span>
+                      )}
+                      <span>{member?.fullName || member?.name || ''}</span>
                       {member.transferredToTeamName && (
                         <span className="text-[8.5px] px-1 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium whitespace-nowrap">
                           ย้ายไป {member.transferredToTeamName}
@@ -294,7 +299,7 @@ export const CalendarLeave: React.FC<CalendarLeaveProps> = ({
                           isHol
                             ? 'วันหยุดบริษัท'
                             : leaveConfig
-                            ? `${member.name} (${member.teamName}): ${leaveConfig.label} (${formatDateTH(dStr)})`
+                            ? `${member.fullName || member.name} (${member.teamName}): ${leaveConfig.label} (${formatDateTH(dStr)})`
                             : `คลิกเพื่อบันทึกวันลา (${formatDateTH(dStr)})`
                         }
                         className={`border border-gray-100 text-center font-bold cursor-pointer transition-colors ${

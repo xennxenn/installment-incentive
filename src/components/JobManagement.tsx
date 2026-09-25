@@ -119,8 +119,8 @@ export const JobManagement: React.FC<JobManagementProps> = ({
     const leave = (leaves || []).find(l => l.techId === techId && l.date === newDate);
     const isLeave = !!(leave && leave.type !== 'no_inc');
     const member = (teams || []).flatMap(t => t.members || []).find(m => m.id === techId);
-    const isResigned = member?.resignDate && newDate > member.resignDate;
-    const isNotYetJoined = member?.joinDate && newDate < member.joinDate;
+    const isResigned = member?.resignDate && (newDate > member.resignDate || member.resignDate < periodStart);
+    const isNotYetJoined = member?.joinDate && (newDate < member.joinDate || member.joinDate > periodEnd);
 
     if (isLeave || isResigned || isNotYetJoined) return;
 
@@ -323,7 +323,14 @@ export const JobManagement: React.FC<JobManagementProps> = ({
 
   const matchTechnicians = (techText: string, teamList: Team[]): string[] => {
     if (!techText) return [];
-    const allMembers = (teamList || []).flatMap(t => t.members || []);
+    const allMembers = (teamList || [])
+      .flatMap(t => t.members || [])
+      .filter(m => {
+        if (!m) return false;
+        if (m.resignDate && m.resignDate < periodStart) return false;
+        if (m.joinDate && m.joinDate > periodEnd) return false;
+        return true;
+      });
     
     // Split by commas, slashes, pluses, or Thai conjunctions
     const rawParts = techText.split(/[,/+]|\s+และ\s+/).map(s => s.trim()).filter(Boolean);
@@ -1000,70 +1007,88 @@ export const JobManagement: React.FC<JobManagementProps> = ({
                   {/* Tech Selector badges */}
                   <td className="p-3 align-top">
                     <div className="flex flex-wrap items-start gap-1.5 py-0.5 w-full">
-                      {(teams || []).filter(Boolean).map(team => (
-                        <div key={team.id} className="border border-gray-300 rounded-lg p-1.5 bg-white shadow-2xs">
-                          <div className="font-bold text-[10px] text-gray-800 mb-1 leading-tight border-b border-gray-100 pb-0.5">
-                            {team?.name || ''}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1">
-                            {(team.members || []).filter(Boolean).map(member => {
-                              const isSelected = (job.selectedTechs || []).includes(member.id);
+                      {(teams || []).filter(Boolean).map(team => {
+                        // Filter active members for this period & job date:
+                        // 1. Must not have resigned before periodStart
+                        // 2. Must not have joined after periodEnd
+                        // 3. For this job date: if resigned before job.date and not already selected on this job, omit completely!
+                        const visibleMembers = (team.members || []).filter(member => {
+                          if (!member) return false;
+                          if (member.resignDate && member.resignDate < periodStart) return false;
+                          if (member.joinDate && member.joinDate > periodEnd) return false;
+                          const isSelected = (job.selectedTechs || []).includes(member.id);
+                          if (member.resignDate && job.date && job.date > member.resignDate && !isSelected) return false;
+                          if (member.joinDate && job.date && job.date < member.joinDate && !isSelected) return false;
+                          return true;
+                        });
 
-                              const leave = leaves.find(l => l.techId === member.id && l.date === job.date);
-                              const isNoInc = leave?.type === 'no_inc';
-                              const isLeave = leave && !isNoInc;
+                        if (visibleMembers.length === 0) return null;
 
-                              const isResigned = member.resignDate && job.date > member.resignDate;
-                              const isNotYetJoined = member.joinDate && job.date < member.joinDate;
-                              const isDisabled = isLeave || isResigned || isNotYetJoined;
+                        return (
+                          <div key={team.id} className="border border-gray-300 rounded-lg p-1.5 bg-white shadow-2xs">
+                            <div className="font-bold text-[10px] text-gray-800 mb-1 leading-tight border-b border-gray-100 pb-0.5">
+                              {team?.name || ''}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1">
+                              {visibleMembers.map(member => {
+                                const isSelected = (job.selectedTechs || []).includes(member.id);
 
-                              let badgeStyle = {};
-                              if (isSelected && !isDisabled) {
-                                badgeStyle = isNoInc
-                                  ? { backgroundColor: '#f3e8ff', color: '#7e22ce', borderColor: '#d8b4fe' }
-                                  : { backgroundColor: themeColor, color: themeTextColor, borderColor: themeColor };
-                              }
+                                const leave = leaves.find(l => l.techId === member.id && l.date === job.date);
+                                const isNoInc = leave?.type === 'no_inc';
+                                const isLeave = leave && !isNoInc;
 
-                              return (
-                                <button
-                                  key={member.id}
-                                  onClick={() => {
-                                    if (!isDisabled) {
-                                      const current = job.selectedTechs || [];
-                                      const next = current.includes(member.id)
-                                        ? current.filter(id => id !== member.id)
-                                        : [...current, member.id];
-                                      onUpdateJob(job.id, 'selectedTechs', next);
+                                const isResigned = member.resignDate && job.date > member.resignDate;
+                                const isNotYetJoined = member.joinDate && job.date < member.joinDate;
+                                const isDisabled = isLeave || isResigned || isNotYetJoined;
+
+                                let badgeStyle = {};
+                                if (isSelected && !isDisabled) {
+                                  badgeStyle = isNoInc
+                                    ? { backgroundColor: '#f3e8ff', color: '#7e22ce', borderColor: '#d8b4fe' }
+                                    : { backgroundColor: themeColor, color: themeTextColor, borderColor: themeColor };
+                                }
+
+                                return (
+                                  <button
+                                    key={member.id}
+                                    onClick={() => {
+                                      if (!isDisabled) {
+                                        const current = job.selectedTechs || [];
+                                        const next = current.includes(member.id)
+                                          ? current.filter(id => id !== member.id)
+                                          : [...current, member.id];
+                                        onUpdateJob(job.id, 'selectedTechs', next);
+                                      }
+                                    }}
+                                    disabled={isDisabled}
+                                    style={badgeStyle}
+                                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold border transition-all whitespace-nowrap ${
+                                      !isSelected && !isDisabled ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-200' : ''
+                                    } ${
+                                      isLeave ? 'opacity-40 cursor-not-allowed bg-red-100 text-red-500 border-red-200 line-through' : ''
+                                    } ${
+                                      isResigned || isNotYetJoined ? 'line-through bg-gray-200 text-gray-400 cursor-not-allowed border-gray-300' : ''
+                                    }`}
+                                    title={
+                                      isLeave
+                                        ? `ลา (${leave?.type})`
+                                        : isNoInc
+                                        ? 'เข้างานแต่ไม่คิดเงิน (No Incentive)'
+                                        : isResigned
+                                        ? 'ลาออกแล้ว'
+                                        : isNotYetJoined
+                                        ? 'ยังไม่เริ่มงาน'
+                                        : 'คลิกเพื่อเลือก/ยกเลิกช่าง'
                                     }
-                                  }}
-                                  disabled={isDisabled}
-                                  style={badgeStyle}
-                                  className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold border transition-all whitespace-nowrap ${
-                                    !isSelected && !isDisabled ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-200' : ''
-                                  } ${
-                                    isLeave ? 'opacity-40 cursor-not-allowed bg-red-100 text-red-500 border-red-200 line-through' : ''
-                                  } ${
-                                    isResigned || isNotYetJoined ? 'line-through bg-gray-200 text-gray-400 cursor-not-allowed border-gray-300' : ''
-                                  }`}
-                                  title={
-                                    isLeave
-                                      ? `ลา (${leave?.type})`
-                                      : isNoInc
-                                      ? 'เข้างานแต่ไม่คิดเงิน (No Incentive)'
-                                      : isResigned
-                                      ? 'ลาออกแล้ว'
-                                      : isNotYetJoined
-                                      ? 'ยังไม่เริ่มงาน'
-                                      : 'คลิกเพื่อเลือก/ยกเลิกช่าง'
-                                  }
-                                >
-                                  {member?.name || ''}
-                                </button>
-                              );
-                            })}
+                                  >
+                                    {member?.name || ''}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </td>
 
@@ -1203,8 +1228,8 @@ export const JobManagement: React.FC<JobManagementProps> = ({
                         const l = (leaves || []).find(item => item.techId === techId && item.date === selectedDate);
                         const m = (teams || []).flatMap(t => t.members || []).find(mem => mem.id === techId);
                         const isLeave = !!(l && l.type !== 'no_inc');
-                        const isResigned = m?.resignDate && selectedDate > m.resignDate;
-                        const isNotYet = m?.joinDate && selectedDate < m.joinDate;
+                        const isResigned = m?.resignDate && (selectedDate > m.resignDate || m.resignDate < periodStart);
+                        const isNotYet = m?.joinDate && (selectedDate < m.joinDate || m.joinDate > periodEnd);
                         return !isLeave && !isResigned && !isNotYet;
                       }));
                     }}
@@ -1316,56 +1341,63 @@ export const JobManagement: React.FC<JobManagementProps> = ({
               <div>
                 <label className="block font-bold text-gray-700 mb-2">เลือกช่างที่จะปฏิบัติงาน:</label>
                 <div className="space-y-2 border rounded-xl p-3 max-h-48 overflow-y-auto bg-gray-50/50">
-                  {(teams || []).filter(Boolean).map(team => (
-                    <div key={team.id} className="space-y-1">
-                      <div className="text-[11px] font-bold text-gray-600">{team?.name || ''}</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {(team.members || []).filter(Boolean).map(member => {
-                          const isSelected = newSelectedTechs.includes(member.id);
-                          const leave = (leaves || []).find(l => l.techId === member.id && l.date === newDate);
-                          const isNoInc = leave?.type === 'no_inc';
-                          const isLeave = !!(leave && !isNoInc);
-                          const isResigned = member.resignDate && newDate > member.resignDate;
-                          const isNotYetJoined = member.joinDate && newDate < member.joinDate;
-                          const isDisabled = isLeave || isResigned || isNotYetJoined;
+                  {(teams || []).filter(Boolean).map(team => {
+                    const activeModalMembers = (team.members || []).filter(member => {
+                      if (!member) return false;
+                      if (member.resignDate && member.resignDate < periodStart) return false;
+                      if (member.joinDate && member.joinDate > periodEnd) return false;
+                      if (member.resignDate && newDate > member.resignDate) return false;
+                      if (member.joinDate && newDate < member.joinDate) return false;
+                      return true;
+                    });
 
-                          let disabledReason = '';
-                          if (isLeave) {
-                            const leaveLabel = leave?.type === 'sick' ? 'ลาป่วย' : leave?.type === 'business' ? 'ลากิจ' : leave?.type === 'vacation' ? 'พักร้อน' : 'ลา';
-                            disabledReason = ` (${leaveLabel})`;
-                          } else if (isResigned) {
-                            disabledReason = ' (ลาออก)';
-                          } else if (isNotYetJoined) {
-                            disabledReason = ' (ยังไม่เริ่มงาน)';
-                          }
+                    if (activeModalMembers.length === 0) return null;
 
-                          return (
-                            <button
-                              type="button"
-                              key={member.id}
-                              disabled={isDisabled}
-                              onClick={() => toggleModalTech(member.id)}
-                              title={isDisabled ? `${member?.name} ไม่สามารถเลือกได้: ${disabledReason}` : member?.name}
-                              style={
-                                isSelected && !isDisabled
-                                  ? { backgroundColor: themeColor, color: themeTextColor }
-                                  : {}
-                              }
-                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
-                                isDisabled
-                                  ? 'bg-gray-100 border-gray-200 text-gray-400 opacity-50 cursor-not-allowed line-through'
-                                  : isSelected
-                                  ? ''
-                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100 cursor-pointer'
-                              }`}
-                            >
-                              {member?.name || ''}{disabledReason}
-                            </button>
-                          );
-                        })}
+                    return (
+                      <div key={team.id} className="space-y-1">
+                        <div className="text-[11px] font-bold text-gray-600">{team?.name || ''}</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {activeModalMembers.map(member => {
+                            const isSelected = newSelectedTechs.includes(member.id);
+                            const leave = (leaves || []).find(l => l.techId === member.id && l.date === newDate);
+                            const isNoInc = leave?.type === 'no_inc';
+                            const isLeave = !!(leave && !isNoInc);
+                            const isDisabled = isLeave;
+
+                            let disabledReason = '';
+                            if (isLeave) {
+                              const leaveLabel = leave?.type === 'sick' ? 'ลาป่วย' : leave?.type === 'business' ? 'ลากิจ' : leave?.type === 'vacation' ? 'พักร้อน' : 'ลา';
+                              disabledReason = ` (${leaveLabel})`;
+                            }
+
+                            return (
+                              <button
+                                type="button"
+                                key={member.id}
+                                disabled={isDisabled}
+                                onClick={() => toggleModalTech(member.id)}
+                                title={isDisabled ? `${member?.name} ไม่สามารถเลือกได้: ${disabledReason}` : member?.name}
+                                style={
+                                  isSelected && !isDisabled
+                                    ? { backgroundColor: themeColor, color: themeTextColor }
+                                    : {}
+                                }
+                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                                  isDisabled
+                                    ? 'bg-gray-100 border-gray-200 text-gray-400 opacity-50 cursor-not-allowed line-through'
+                                    : isSelected
+                                    ? ''
+                                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100 cursor-pointer'
+                                }`}
+                              >
+                                {member?.name || ''}{disabledReason}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

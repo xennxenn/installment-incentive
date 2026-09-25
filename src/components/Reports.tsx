@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Printer, Users, User, Layers, LayoutDashboard, FileSpreadsheet, ClipboardList, CheckSquare, AlertCircle } from 'lucide-react';
 import { Team, PayPeriod } from '../types';
-import { CalculationResult, formatDateTH } from '../utils/calculator';
+import { CalculationResult, formatDateTH, getTechOfficialName, isMemberActiveInPeriod } from '../utils/calculator';
 import { LOGO_URL } from '../data/initialData';
 
 interface ReportsProps {
@@ -27,14 +27,24 @@ export const Reports: React.FC<ReportsProps> = ({
   // Selective printing controls for Overview Report (รายงานภาพรวมทั้งหมด)
   const [overviewSections, setOverviewSections] = useState({
     kpis: true,       // สรุปภาพรวม KPI
-    section1: true,   // ส่วนที่ 1: สรุปผลงานและยอด Incentive แยกตามทีมช่าง
-    section2: true,   // ส่วนที่ 2: สรุปสัดส่วนผลงานแยกตามประเภทงาน
-    section3: true,   // ส่วนที่ 3: สรุปผลตอบแทนสวัสดิการช่างรายบุคคล
+    section1: true,   // สรุปผลงานและยอด Incentive แยกตามทีมช่าง
+    section2: true,   // สรุปสัดส่วนผลงานแยกตามประเภทงาน
+    section3: true,   // สรุปผลตอบแทนสวัสดิการช่างรายบุคคล
     signatures: true, // ช่องทางลงนามและอนุมัติ
   });
 
+  // Filter technicians who are active in this specific pay period
   const allTechs = (teams || []).filter(Boolean).flatMap(t =>
-    (t?.members || []).filter(Boolean).map(m => ({ id: m.id, name: m.name || '', teamName: t?.name || '' }))
+    (t?.members || [])
+      .filter(m => m && isMemberActiveInPeriod(m, period?.start, period?.end))
+      .map(m => ({ 
+        id: m.id, 
+        name: m.name || '', 
+        employeeId: m.employeeId || '',
+        fullName: m.fullName || '',
+        officialName: getTechOfficialName(m),
+        teamName: t?.name || '' 
+      }))
   );
 
   const issueDateStr = new Date().toLocaleDateString('th-TH', {
@@ -53,7 +63,7 @@ export const Reports: React.FC<ReportsProps> = ({
       .filter(Boolean)
       .flatMap(t => (t?.members || []).filter(Boolean))
       .filter(m => m && jobTechs.includes(m.id))
-      .map(m => m.name || '')
+      .map(m => getTechOfficialName(m))
       .filter(Boolean);
     return names.length > 0 ? names.join(', ') : '-';
   };
@@ -140,7 +150,7 @@ export const Reports: React.FC<ReportsProps> = ({
                 <option value="">-- กรุณาเลือกพนักงาน --</option>
                 {(allTechs || []).filter(Boolean).map(tech => (
                   <option key={tech.id} value={tech.id}>
-                    {tech?.name || ''} ({tech?.teamName || ''})
+                    {tech.employeeId ? `[${tech.employeeId}] ` : ''}{tech.officialName} ({tech.teamName})
                   </option>
                 ))}
               </select>
@@ -193,10 +203,10 @@ export const Reports: React.FC<ReportsProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800 mr-1.5">
               <CheckSquare size={16} className="text-indigo-600 shrink-0" />
-              <span>เลือกส่วนที่ต้องการพิมพ์:</span>
+              <span>เลือกหัวข้อที่ต้องการพิมพ์:</span>
             </div>
 
-            {/* Checkbox for Section 1 */}
+            {/* Checkbox for Team Summary */}
             <label
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer select-none transition-all border ${
                 overviewSections.section1
@@ -210,10 +220,10 @@ export const Reports: React.FC<ReportsProps> = ({
                 onChange={e => setOverviewSections(prev => ({ ...prev, section1: e.target.checked }))}
                 className="rounded text-blue-600 focus:ring-blue-400 h-3.5 w-3.5 cursor-pointer"
               />
-              <span>ส่วนที่ 1: สรุปตามทีมช่าง</span>
+              <span>สรุปตามทีมช่าง</span>
             </label>
 
-            {/* Checkbox for Section 2 */}
+            {/* Checkbox for Job Type Summary */}
             <label
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer select-none transition-all border ${
                 overviewSections.section2
@@ -227,10 +237,10 @@ export const Reports: React.FC<ReportsProps> = ({
                 onChange={e => setOverviewSections(prev => ({ ...prev, section2: e.target.checked }))}
                 className="rounded text-purple-600 focus:ring-purple-400 h-3.5 w-3.5 cursor-pointer"
               />
-              <span>ส่วนที่ 2: สรุปตามประเภทงาน</span>
+              <span>สรุปตามประเภทงาน</span>
             </label>
 
-            {/* Checkbox for Section 3 */}
+            {/* Checkbox for Individual Summary */}
             <label
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer select-none transition-all border ${
                 overviewSections.section3
@@ -244,7 +254,7 @@ export const Reports: React.FC<ReportsProps> = ({
                 onChange={e => setOverviewSections(prev => ({ ...prev, section3: e.target.checked }))}
                 className="rounded text-emerald-600 focus:ring-emerald-400 h-3.5 w-3.5 cursor-pointer"
               />
-              <span>ส่วนที่ 3: สรุปรายบุคคล</span>
+              <span>สรุปรายบุคคล</span>
             </label>
 
             <span className="text-gray-300 hidden sm:inline">|</span>
@@ -313,9 +323,9 @@ export const Reports: React.FC<ReportsProps> = ({
                 })
               }
               className="px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold transition-colors text-[11px] border border-indigo-200"
-              title="เลือกเฉพาะส่วนที่ 1 และส่วนที่ 3 ตามที่ต้องการ"
+              title="เลือกเฉพาะสรุปตามทีมช่าง และสรุปรายบุคคล"
             >
-              เฉพาะส่วนที่ 1 &amp; 3
+              เฉพาะทีม &amp; รายบุคคล
             </button>
             <button
               type="button"
@@ -441,7 +451,7 @@ export const Reports: React.FC<ReportsProps> = ({
                   <tr>
                     <th colSpan={7} className="border-none p-0 font-normal text-left bg-transparent">
                       <div className="font-extrabold text-xs text-gray-900 py-1 border-b border-gray-300 flex justify-between items-center mb-1">
-                        <span>ส่วนที่ 1: สรุปผลงานและยอด Incentive แยกตามทีมช่าง</span>
+                        <span>สรุปผลงานและยอด Incentive แยกตามทีมช่าง</span>
                         <span className="text-[11px] font-normal text-gray-600">ทั้งหมด {calcData.teamStats.length} ทีม</span>
                       </div>
                     </th>
@@ -494,7 +504,7 @@ export const Reports: React.FC<ReportsProps> = ({
                   <tr>
                     <th colSpan={6} className="border-none p-0 font-normal text-left bg-transparent">
                       <div className="font-extrabold text-xs text-gray-900 py-1 border-b border-gray-300 flex justify-between items-center mb-1">
-                        <span>ส่วนที่ 2: สรุปสัดส่วนผลงานแยกตามประเภทงาน (Job Type Analytics)</span>
+                        <span>สรุปสัดส่วนผลงานแยกตามประเภทงาน (Job Type Analytics)</span>
                         <span className="text-[11px] font-normal text-gray-600">ทั้งหมด {overallStats.length} ประเภทงาน</span>
                       </div>
                     </th>
@@ -543,16 +553,17 @@ export const Reports: React.FC<ReportsProps> = ({
               <table className="report-table w-full text-left text-xs border-collapse border border-gray-300 mb-4 bg-transparent">
                 <thead>
                   <tr>
-                    <th colSpan={6} className="border-none p-0 font-normal text-left bg-transparent">
+                    <th colSpan={7} className="border-none p-0 font-normal text-left bg-transparent">
                       <div className="font-extrabold text-xs text-gray-900 py-1 border-b border-gray-300 flex justify-between items-center mb-1">
-                        <span>ส่วนที่ 3: สรุปผลตอบแทนสวัสดิการช่างรายบุคคล (Individual Technician Earnings)</span>
+                        <span>สรุปผลตอบแทนสวัสดิการช่างรายบุคคล (Individual Technician Earnings)</span>
                         <span className="text-[11px] font-normal text-gray-600">ทั้งหมด {calcData.individualStats.length} คน</span>
                       </div>
                     </th>
                   </tr>
                   <tr className="text-gray-900 font-bold border-b border-gray-400 table-column-header bg-transparent">
                     <th className="border border-gray-300 py-1.5 px-2 text-center w-10 bg-transparent">ลำดับ</th>
-                    <th className="border border-gray-300 py-1.5 px-2 text-left bg-transparent">ชื่อ-สกุล ช่างปฏิบัติงาน</th>
+                    <th className="border border-gray-300 py-1.5 px-2 text-center w-24 bg-transparent">รหัสพนักงาน</th>
+                    <th className="border border-gray-300 py-1.5 px-2 text-left bg-transparent">ชื่อจริง (ชื่อเล่น) นามสกุล</th>
                     <th className="border border-gray-300 py-1.5 px-2 text-left w-36 bg-transparent">สังกัดทีม</th>
                     <th className="border border-gray-300 py-1.5 px-2 text-center w-28 bg-transparent">วันทำงานจริง</th>
                     <th className="border border-gray-300 py-1.5 px-2 text-right w-36 bg-transparent">ยอดรับสุทธิ (บาท)</th>
@@ -567,7 +578,8 @@ export const Reports: React.FC<ReportsProps> = ({
                     return (
                       <tr key={tech.id} className="bg-transparent">
                         <td className="border border-gray-300 py-1.5 px-2 text-center text-gray-600 font-medium bg-transparent">{idx + 1}</td>
-                        <td className="border border-gray-300 py-1.5 px-2 font-bold text-gray-900 bg-transparent">{tech.name}</td>
+                        <td className="border border-gray-300 py-1.5 px-2 text-center font-mono text-gray-700 bg-transparent">{tech.employeeId || '-'}</td>
+                        <td className="border border-gray-300 py-1.5 px-2 font-bold text-gray-900 bg-transparent">{getTechOfficialName(tech)}</td>
                         <td className="border border-gray-300 py-1.5 px-2 text-gray-700 font-medium bg-transparent">{tech.teamName}</td>
                         <td className="border border-gray-300 py-1.5 px-2 text-center font-semibold text-gray-800 bg-transparent">{tech.workDays || 0} วัน</td>
                         <td className="border border-gray-300 py-1.5 px-2 text-right font-black text-emerald-800 bg-transparent">฿{Math.round(tech.incentive || 0).toLocaleString()}</td>
@@ -578,7 +590,7 @@ export const Reports: React.FC<ReportsProps> = ({
                 </tbody>
                 <tfoot className="bg-transparent">
                   <tr className="font-bold border-t border-b-2 border-gray-400 bg-transparent">
-                    <td colSpan={2} className="border border-gray-300 py-1.5 px-2 text-right font-black text-gray-900 bg-transparent">รวมจ่ายค่าสวัสดิการช่างรายบุคคล:</td>
+                    <td colSpan={3} className="border border-gray-300 py-1.5 px-2 text-right font-black text-gray-900 bg-transparent">รวมจ่ายค่าสวัสดิการช่างรายบุคคล:</td>
                     <td className="border border-gray-300 py-1.5 px-2 text-gray-700 bg-transparent">{calcData.individualStats.length} คน</td>
                     <td className="border border-gray-300 py-1.5 px-2 text-center font-black text-blue-900 bg-transparent">
                       {calcData.individualStats.reduce((s, t) => s + (t.workDays || 0), 0)} วัน-คน
@@ -598,7 +610,7 @@ export const Reports: React.FC<ReportsProps> = ({
                 <AlertCircle size={32} className="mx-auto text-amber-500 mb-2" />
                 <h3 className="font-bold text-sm text-gray-800">ยังไม่ได้เลือกส่วนข้อมูลสำหรับพิมพ์รายงาน</h3>
                 <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
-                  กรุณาทำเครื่องหมายถูกที่ตัวเลือกด้านบน (เช่น ส่วนที่ 1, ส่วนที่ 2 หรือส่วนที่ 3) เพื่อเลือกข้อมูลที่ต้องการนำมาแสดงและพิมพ์ออกรายงาน
+                  กรุณาทำเครื่องหมายถูกที่ตัวเลือกด้านบน (เช่น สรุปตามทีมช่าง, สรุปตามประเภทงาน หรือสรุปรายบุคคล) เพื่อเลือกข้อมูลที่ต้องการนำมาแสดงและพิมพ์ออกรายงาน
                 </p>
                 <div className="mt-3.5 flex justify-center gap-2">
                   <button
@@ -606,7 +618,7 @@ export const Reports: React.FC<ReportsProps> = ({
                     onClick={() => setOverviewSections(prev => ({ ...prev, section1: true, section3: true }))}
                     className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors"
                   >
-                    เลือกส่วนที่ 1 และส่วนที่ 3
+                    เลือกสรุปตามทีมช่าง และสรุปรายบุคคล
                   </button>
                   <button
                     type="button"
@@ -925,38 +937,48 @@ export const Reports: React.FC<ReportsProps> = ({
                           </div>
 
                           {/* Tech Info Metrics Header - Clean border box as in IMG_1823.png */}
-                          <table className="w-full border border-gray-400 rounded-sm border-collapse text-xs mb-2 bg-transparent print-bordered-box">
-                            <tbody>
-                              <tr>
-                                <td className="border-r border-gray-400 p-2 text-left w-1/3 align-middle bg-transparent">
-                                  <span className="text-gray-600 block text-[10.5px] leading-snug">ชื่อพนักงานช่าง:</span>
-                                  <strong className="text-xs md:text-sm text-gray-900 font-bold block leading-snug">
-                                    {calcData.reportTechLogs[selectedTechId]?.name || ''}
-                                  </strong>
-                                  <span className="text-gray-500 text-[10px] md:text-[10.5px] block leading-snug">
-                                    (สังกัดทีม: {calcData.reportTechLogs[selectedTechId]?.teamName || ''})
-                                  </span>
-                                </td>
-                                <td className="border-r border-gray-400 p-2 text-center w-1/3 align-middle bg-transparent">
-                                  <span className="text-gray-600 block text-[10.5px] leading-snug">วันเข้าปฏิบัติงานจริง:</span>
-                                  <strong className="text-xs md:text-sm text-gray-900 font-bold block leading-snug">
-                                    {calcData.individualStats.find(s => s.id === selectedTechId)?.workDays || 0} วัน
-                                  </strong>
-                                </td>
-                                <td className="p-2 text-right w-1/3 align-middle bg-transparent">
-                                  <span className="text-gray-600 block text-[10.5px] leading-snug">ยอดรับเงินสุทธิส่วนบุคคล:</span>
-                                  <strong className="text-sm md:text-base text-emerald-800 font-black block leading-snug">
-                                    ฿{Math.round(
-                                      calcData.reportTechLogs[selectedTechId].rows.reduce(
-                                        (sum, r) => sum + (typeof r.inc === 'number' ? r.inc : 0),
-                                        0
-                                      )
-                                    ).toLocaleString()}
-                                  </strong>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
+                          {(() => {
+                            const selectedTechItem = allTechs.find(t => t.id === selectedTechId) || (teams || []).flatMap(t => t.members || []).find(m => m.id === selectedTechId);
+                            return (
+                              <table className="w-full border border-gray-400 rounded-sm border-collapse text-xs mb-2 bg-transparent print-bordered-box">
+                                <tbody>
+                                  <tr>
+                                    <td className="border-r border-gray-400 p-2 text-left w-1/3 align-middle bg-transparent">
+                                      {selectedTechItem?.employeeId && (
+                                        <span className="text-[10px] font-mono text-gray-500 block leading-tight">
+                                          รหัสพนักงาน: <strong>{selectedTechItem.employeeId}</strong>
+                                        </span>
+                                      )}
+                                      <span className="text-gray-600 block text-[10.5px] leading-snug">ชื่อพนักงานช่าง:</span>
+                                      <strong className="text-xs md:text-sm text-gray-900 font-bold block leading-snug">
+                                        {selectedTechItem ? getTechOfficialName(selectedTechItem) : (calcData.reportTechLogs[selectedTechId]?.name || '')}
+                                      </strong>
+                                      <span className="text-gray-500 text-[10px] md:text-[10.5px] block leading-snug">
+                                        (สังกัดทีม: {calcData.reportTechLogs[selectedTechId]?.teamName || ''})
+                                      </span>
+                                    </td>
+                                    <td className="border-r border-gray-400 p-2 text-center w-1/3 align-middle bg-transparent">
+                                      <span className="text-gray-600 block text-[10.5px] leading-snug">วันเข้าปฏิบัติงานจริง:</span>
+                                      <strong className="text-xs md:text-sm text-gray-900 font-bold block leading-snug">
+                                        {calcData.individualStats.find(s => s.id === selectedTechId)?.workDays || 0} วัน
+                                      </strong>
+                                    </td>
+                                    <td className="p-2 text-right w-1/3 align-middle bg-transparent">
+                                      <span className="text-gray-600 block text-[10.5px] leading-snug">ยอดรับเงินสุทธิส่วนบุคคล:</span>
+                                      <strong className="text-sm md:text-base text-emerald-800 font-black block leading-snug">
+                                        ฿{Math.round(
+                                          calcData.reportTechLogs[selectedTechId]?.rows?.reduce(
+                                            (sum, r) => sum + (typeof r.inc === 'number' ? r.inc : 0),
+                                            0
+                                          ) || 0
+                                        ).toLocaleString()}
+                                      </strong>
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            );
+                          })()}
                         </th>
                       </tr>
 
@@ -1165,7 +1187,8 @@ export const Reports: React.FC<ReportsProps> = ({
                   {jobTypeViewSubtab === 'by_tech' && (
                     <tr className="text-gray-900 font-bold border-b border-gray-400 table-column-header bg-transparent">
                       <th className="border border-gray-300 py-1.5 px-2 text-center w-10 bg-transparent">ลำดับ</th>
-                      <th className="border border-gray-300 py-1.5 px-2 text-left w-36 bg-transparent">ชื่อช่าง</th>
+                      <th className="border border-gray-300 py-1.5 px-2 text-center w-24 bg-transparent">รหัสพนักงาน</th>
+                      <th className="border border-gray-300 py-1.5 px-2 text-left w-48 bg-transparent">ชื่อจริง (ชื่อเล่น) นามสกุล</th>
                       <th className="border border-gray-300 py-1.5 px-2 text-left w-28 bg-transparent">สังกัดทีม</th>
                       <th className="border border-gray-300 py-1.5 px-2 text-left bg-transparent">ประเภทงาน</th>
                       <th className="border border-gray-300 py-1.5 px-2 text-center w-20 bg-transparent">จำนวนงาน</th>
@@ -1286,9 +1309,17 @@ export const Reports: React.FC<ReportsProps> = ({
                             {bIdx === 0 && (
                               <td
                                 rowSpan={techStat.breakdown.length}
+                                className="border border-gray-300 py-1.5 px-2 text-center font-mono text-gray-700 align-top bg-transparent"
+                              >
+                                {techStat.employeeId || '-'}
+                              </td>
+                            )}
+                            {bIdx === 0 && (
+                              <td
+                                rowSpan={techStat.breakdown.length}
                                 className="border border-gray-300 py-1.5 px-2 font-bold text-gray-900 align-top bg-transparent"
                               >
-                                {techStat.techName}
+                                {getTechOfficialName(techStat)}
                               </td>
                             )}
                             {bIdx === 0 && (
@@ -1309,7 +1340,7 @@ export const Reports: React.FC<ReportsProps> = ({
                       })}
                       {techJobTypeStats.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="text-center p-8 text-gray-400 bg-transparent">
+                          <td colSpan={7} className="text-center p-8 text-gray-400 bg-transparent">
                             ไม่มีข้อมูลผลงานรายคน
                           </td>
                         </tr>

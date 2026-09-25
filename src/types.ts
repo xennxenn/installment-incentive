@@ -10,7 +10,9 @@ export interface AppUser {
 
 export interface TeamMember {
   id: string;
-  name: string;
+  name: string; // ชื่อช่างในระบบ (แสดงในหน้าบันทึกงานเท่านั้น เช่น ช่างนาย)
+  employeeId?: string; // 1. รหัสพนักงาน (เช่น EMP-001, 67001)
+  fullName?: string; // 2. ชื่อจริง (ชื่อเล่น) นามสกุล (เช่น สมชาย (นาย) ใจกล้า)
   joinDate: string; // YYYY-MM-DD
   resignDate?: string; // YYYY-MM-DD
   transferredToId?: string; // ID of member in destination team

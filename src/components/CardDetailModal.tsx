@@ -384,7 +384,8 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
                   <table className="w-full text-xs">
                     <thead className="bg-gray-100/70 text-gray-600 font-semibold border-b sticky top-0">
                       <tr>
-                        <th className="p-2.5 text-left">ชื่อช่าง</th>
+                        <th className="p-2.5 text-left w-20">รหัส</th>
+                        <th className="p-2.5 text-left">ชื่อจริง (ชื่อเล่น) นามสกุล</th>
                         <th className="p-2.5 text-left">สังกัดทีม</th>
                         <th className="p-2.5 text-center">วันที่เข้าทำงาน</th>
                         <th className="p-2.5 text-center">วันทำงานในรอบ</th>
@@ -398,13 +399,15 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
                           if (!searchTerm) return true;
                           const term = searchTerm.toLowerCase();
                           return (
-                            (tech.name || '').toLowerCase().includes(term) ||
+                            (tech.fullName || tech.name || '').toLowerCase().includes(term) ||
+                            (tech.employeeId || '').toLowerCase().includes(term) ||
                             (tech.teamName || '').toLowerCase().includes(term)
                           );
                         })
                         .map(tech => (
                           <tr key={tech.id} className="hover:bg-gray-50">
-                            <td className="p-2.5 font-bold text-gray-800">{tech?.name || ''}</td>
+                            <td className="p-2.5 font-mono text-[11px] text-gray-500 font-bold">{tech.employeeId || '-'}</td>
+                            <td className="p-2.5 font-bold text-gray-800">{tech?.fullName || tech?.name || ''}</td>
                             <td className="p-2.5 font-medium text-gray-600">{tech.teamName}</td>
                             <td className="p-2.5 text-center text-gray-500">{formatDateTH(tech.joinDate) || '-'}</td>
                             <td className="p-2.5 text-center font-bold text-gray-700">{tech.workDays} วัน</td>
@@ -530,7 +533,8 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
                   <table className="w-full text-xs">
                     <thead className="bg-gray-100/70 text-gray-600 font-semibold border-b">
                       <tr>
-                        <th className="p-2.5 text-left">ชื่อช่าง</th>
+                        <th className="p-2.5 text-left w-20">รหัส</th>
+                        <th className="p-2.5 text-left">ชื่อจริง (ชื่อเล่น) นามสกุล</th>
                         <th className="p-2.5 text-center">ประเภทการลา</th>
                         <th className="p-2.5 text-left">วันที่ลา</th>
                       </tr>
@@ -538,12 +542,15 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
                     <tbody className="divide-y divide-gray-100">
                       {leaves.length > 0 ? (
                         leaves.map((leave, idx) => {
-                          const techName = (teams || [])
+                          const mem = (teams || [])
                             .flatMap(t => t.members || [])
-                            .find(m => m.id === leave.memberId)?.name || leave.memberId;
+                            .find(m => m.id === leave.memberId || m.id === leave.techId);
+                          const techName = mem ? (mem.fullName || mem.name) : (leave.memberId || '-');
+                          const empId = mem?.employeeId || '-';
 
                           return (
                             <tr key={idx} className="hover:bg-gray-50">
+                              <td className="p-2.5 font-mono text-[11px] text-gray-500 font-bold">{empId}</td>
                               <td className="p-2.5 font-bold text-gray-800">{techName}</td>
                               <td className="p-2.5 text-center">
                                 <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded border border-amber-200 font-semibold text-[10px]">
@@ -556,7 +563,7 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
                         })
                       ) : (
                         <tr>
-                          <td colSpan={3} className="p-4 text-center text-gray-400">
+                          <td colSpan={4} className="p-4 text-center text-gray-400">
                             ไม่มีประวัติการลาในรอบนี้
                           </td>
                         </tr>

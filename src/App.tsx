@@ -221,16 +221,27 @@ export default function App() {
       if (!saved) return INITIAL_TEAMS;
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Strip out any fake technician m11 generated in previous runs
+        // Strip out any fake technician m11 generated in previous runs and backfill employeeId/fullName
         const hasFake = parsed.some((t: any) => t?.members?.some((m: any) => m?.id === 'm11' || m?.name === 'ช่างเซฟ'));
-        if (hasFake) {
-          const cleaned = parsed.map((t: any) => ({
-            ...t,
-            members: (t.members || []).filter((m: any) => m.id !== 'm11' && m.name !== 'ช่างเซฟ')
-          }));
-          return cleaned.length > 0 ? cleaned : INITIAL_TEAMS;
-        }
-        return parsed.filter(Boolean);
+        const sourceList = hasFake
+          ? parsed.map((t: any) => ({
+              ...t,
+              members: (t.members || []).filter((m: any) => m.id !== 'm11' && m.name !== 'ช่างเซฟ')
+            }))
+          : parsed;
+
+        const enriched = sourceList.filter(Boolean).map((t: any) => ({
+          ...t,
+          members: (t.members || []).map((m: any) => {
+            const initMatch = INITIAL_TEAMS.flatMap(it => it.members || []).find(im => im.id === m.id || im.name === m.name);
+            return {
+              ...m,
+              employeeId: m.employeeId || initMatch?.employeeId,
+              fullName: m.fullName || initMatch?.fullName
+            };
+          })
+        }));
+        return enriched.length > 0 ? enriched : INITIAL_TEAMS;
       }
       return INITIAL_TEAMS;
     } catch (e) {
@@ -993,6 +1004,13 @@ export default function App() {
               if (m.id !== linkedMemberId) return m;
               const updated = { ...m };
 
+              if (data.employeeId !== undefined) {
+                updated.employeeId = data.employeeId;
+              }
+              if (data.fullName !== undefined) {
+                updated.fullName = data.fullName;
+              }
+
               // If name was updated, keep name in sync
               if (nameChanged && data.name) {
                 updated.name = data.name.trim();
@@ -1167,6 +1185,8 @@ export default function App() {
       const newTargetRecord: TeamMember = {
         id: newMemberId,
         name: member?.name || '',
+        employeeId: member?.employeeId,
+        fullName: member?.fullName,
         joinDate: actualJoinDate,
         resignDate: undefined,
         transferredFromId: member.id,

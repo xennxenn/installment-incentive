@@ -185,40 +185,40 @@ export const INITIAL_TEAMS: Team[] = [
     id: 't-1',
     name: 'ทีมช่างนาย',
     members: [
-      { id: 'm1', name: 'ช่างนาย', joinDate: '2020-01-01' },
-      { id: 'm2', name: 'ช่างอาท', joinDate: '2020-01-01' },
-      { id: 'm3', name: 'ช่างลิด', joinDate: '2020-01-01' }
+      { id: 'm1', name: 'ช่างนาย', employeeId: 'EMP-001', fullName: 'สมชาย (นาย) ใจกล้า', joinDate: '2020-01-01' },
+      { id: 'm2', name: 'ช่างอาท', employeeId: 'EMP-002', fullName: 'อาทิตย์ (อาท) มงคลชัย', joinDate: '2020-01-01' },
+      { id: 'm3', name: 'ช่างลิด', employeeId: 'EMP-003', fullName: 'ชวลิต (ลิด) ศรีสุวรรณ', joinDate: '2020-01-01' }
     ]
   },
   {
     id: 't-2',
     name: 'ทีมช่างเบนซ์',
     members: [
-      { id: 'm4', name: 'ช่างเบนซ์', joinDate: '2020-01-01' },
-      { id: 'm5', name: 'ช่างกี้', joinDate: '2020-01-01' }
+      { id: 'm4', name: 'ช่างเบนซ์', employeeId: 'EMP-004', fullName: 'ธีรภัทร (เบนซ์) บูรณศิลป์', joinDate: '2020-01-01' },
+      { id: 'm5', name: 'ช่างกี้', employeeId: 'EMP-005', fullName: 'อัครเดช (กี้) ธนาวรกุล', joinDate: '2020-01-01' }
     ]
   },
   {
     id: 't-3',
     name: 'ทีมช่างอั้ม',
     members: [
-      { id: 'm6', name: 'ช่างอั้ม', joinDate: '2020-01-01' },
-      { id: 'm7', name: 'ช่างต้อม', joinDate: '2020-01-01' },
-      { id: 'm8', name: 'ช่างทัด', joinDate: '2020-01-01' }
+      { id: 'm6', name: 'ช่างอั้ม', employeeId: 'EMP-006', fullName: 'อานนท์ (อั้ม) ศรีประสิทธิ์', joinDate: '2020-01-01' },
+      { id: 'm7', name: 'ช่างต้อม', employeeId: 'EMP-007', fullName: 'สุรชัย (ต้อม) พงษ์ศิริ', joinDate: '2020-01-01' },
+      { id: 'm8', name: 'ช่างทัด', employeeId: 'EMP-008', fullName: 'ทัศไนย (ทัด) วงศ์สวัสดิ์', joinDate: '2020-01-01' }
     ]
   },
   {
     id: 't-4',
     name: 'ทีมตัววิ่ง',
     members: [
-      { id: 'm9', name: 'ช่างเวียร์', joinDate: '2020-01-01' }
+      { id: 'm9', name: 'ช่างเวียร์', employeeId: 'EMP-009', fullName: 'ศุกลวัฒน์ (เวียร์) เจริญกิจ', joinDate: '2020-01-01' }
     ]
   },
   {
     id: 't-5',
     name: 'ทีมวัดพื้นที่',
     members: [
-      { id: 'm10', name: 'ช่างเอก', joinDate: '2020-01-01' }
+      { id: 'm10', name: 'ช่างเอก', employeeId: 'EMP-010', fullName: 'เอกชัย (เอก) เกษมสุข', joinDate: '2020-01-01' }
     ]
   }
 ];

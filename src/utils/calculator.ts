@@ -27,6 +27,8 @@ export interface CalculatedTeamStat extends Team {
   members: Array<{
     id: string;
     name: string;
+    employeeId?: string;
+    fullName?: string;
     joinDate: string;
     resignDate?: string;
     incentive: number;
@@ -38,6 +40,8 @@ export interface CalculatedTeamStat extends Team {
 export interface IndividualStat {
   id: string;
   name: string;
+  employeeId?: string;
+  fullName?: string;
   teamName: string;
   workDays: number;
   incentive: number;
@@ -75,6 +79,8 @@ export interface JobTypeTeamStat {
 export interface JobTypeTechStat {
   techId: string;
   techName: string;
+  employeeId?: string;
+  fullName?: string;
   teamName: string;
   totalIncentive: number;
   breakdown: JobTypeBreakdownItem[];
@@ -91,7 +97,7 @@ export interface CalculationResult {
   totalWallSqm: number;
   totalMeasureJobs: number;
   reportTeamLogs: Record<string, { name: string; rows: CalculatedReportRow[] }>;
-  reportTechLogs: Record<string, { name: string; teamName: string; rows: CalculatedReportRow[] }>;
+  reportTechLogs: Record<string, { name: string; employeeId?: string; fullName?: string; teamName: string; rows: CalculatedReportRow[] }>;
   allJobsDetailed: CalculatedReportRow[];
   jobTypeAnalytics: {
     overall: JobTypeOverallStat[];
@@ -154,6 +160,35 @@ export const addDays = (dateStr: string, days: number): string => {
   } catch (e) {
     return dateStr;
   }
+};
+
+/**
+ * Checks whether a team member is considered active in the specified pay period.
+ * If the member resigned before the period started, or joined after the period ended,
+ * they must NOT appear in the period's reports or member listings.
+ */
+export const isMemberActiveInPeriod = (
+  member?: { joinDate?: string; resignDate?: string } | null,
+  periodStart?: string,
+  periodEnd?: string
+): boolean => {
+  if (!member) return false;
+  if (member.joinDate && periodEnd && member.joinDate > periodEnd) return false;
+  if (member.resignDate && periodStart && member.resignDate < periodStart) return false;
+  return true;
+};
+
+/**
+ * Helper to get the official technician name:
+ * "ชื่อจริง (ชื่อเล่น) นามสกุล" if provided, otherwise falls back to system name.
+ */
+export const getTechOfficialName = (
+  member?: { fullName?: string; name?: string } | null
+): string => {
+  if (!member) return '-';
+  const full = (member.fullName || '').trim();
+  if (full) return full;
+  return (member.name || '').trim() || '-';
 };
 
 /**
@@ -497,7 +532,7 @@ export function calculateIncentives(
   const periodWorkingDays = daysInPeriod.filter(d => !safeHolidays.includes(d)).length;
 
   const reportTeamLogs: Record<string, { name: string; rows: CalculatedReportRow[] }> = {};
-  const reportTechLogs: Record<string, { name: string; teamName: string; rows: CalculatedReportRow[] }> = {};
+  const reportTechLogs: Record<string, { name: string; employeeId?: string; fullName?: string; teamName: string; rows: CalculatedReportRow[] }> = {};
   const allJobsDetailed: CalculatedReportRow[] = [];
 
   safeTeams.forEach(t => {
@@ -505,7 +540,15 @@ export function calculateIncentives(
     reportTeamLogs[t.id] = { name: t.name || '', rows: [] };
     (t.members || []).forEach(m => {
       if (!m) return;
-      reportTechLogs[m.id] = { name: m.name || '', teamName: t.name || '', rows: [] };
+      if (isMemberActiveInPeriod(m, safePeriod.start, safePeriod.end)) {
+        reportTechLogs[m.id] = { 
+          name: m.name || '', 
+          employeeId: m.employeeId,
+          fullName: m.fullName,
+          teamName: t.name || '', 
+          rows: [] 
+        };
+      }
     });
   });
 
@@ -519,7 +562,8 @@ export function calculateIncentives(
   });
 
   const teamStats: CalculatedTeamStat[] = safeTeams.map(team => {
-    const membersList = (team.members || []).filter(Boolean);
+    // Exclude members who resigned before this pay period or joined after this pay period
+    const membersList = (team.members || []).filter(m => m && isMemberActiveInPeriod(m, safePeriod.start, safePeriod.end));
     const memberEarnings: Record<string, number> = {};
     const memberLeavesList: Record<string, Array<{ date: string; type: string }>> = {};
 
@@ -836,7 +880,12 @@ export function calculateIncentives(
 
   const individualStats: IndividualStat[] = (teamStats || [])
     .filter(Boolean)
-    .flatMap(t => (t?.members || []).filter(Boolean).map(m => ({ ...m, teamName: t?.name || '' })))
+    .flatMap(t => (t?.members || []).filter(Boolean).map(m => ({ 
+      ...m, 
+      employeeId: m.employeeId,
+      fullName: m.fullName,
+      teamName: t?.name || '' 
+    })))
     .sort((a, b) => (b?.incentive || 0) - (a?.incentive || 0));
 
   const totalTechs = teamStats.reduce((acc, t) => acc + (t.members || []).length, 0);
@@ -914,6 +963,8 @@ export function calculateIncentives(
       return {
         techId: m.id,
         techName: m.name,
+        employeeId: m.employeeId,
+        fullName: m.fullName,
         teamName: m.teamName,
         totalIncentive: techTotal,
         breakdown
