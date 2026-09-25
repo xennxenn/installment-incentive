@@ -228,10 +228,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <tr>
                     <th className="p-2.5 text-center w-8">#</th>
                     <th className="p-2.5 text-left w-20">รหัส</th>
-                    <th className="p-2.5 text-left">ชื่อจริง (ชื่อเล่น) นามสกุล</th>
-                    <th className="p-2.5 text-left">สังกัดทีม</th>
-                    <th className="p-2.5 text-center">วันทำงาน</th>
-                    <th className="p-2.5 text-right">Incentive สะสม</th>
+                    <th className="p-2.5 text-left whitespace-nowrap">ชื่อ-นามสกุล</th>
+                    <th className="p-2.5 text-left whitespace-nowrap">สังกัดทีม</th>
+                    <th className="p-2.5 text-center whitespace-nowrap">วันทำงาน</th>
+                    <th className="p-2.5 text-right whitespace-nowrap">Incentive สะสม</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -245,8 +245,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           {idx === 2 && <span className="text-amber-700">🥉</span>}
                           {!isTop3 && <span className="text-gray-400">{idx + 1}</span>}
                         </td>
-                        <td className="p-2.5 font-mono text-[11px] text-gray-500">{tech.employeeId || '-'}</td>
-                        <td className="p-2.5 font-bold text-gray-800">{tech.fullName || tech.name || ''}</td>
+                        <td className="p-2.5 font-mono text-[11px] text-gray-500 whitespace-nowrap">{tech.employeeId || '-'}</td>
+                        <td className="p-2.5 font-bold text-gray-800 whitespace-nowrap">{tech.fullName || tech.name || ''}</td>
                         <td className="p-2.5 text-gray-500">{tech.teamName || ''}</td>
                         <td className="p-2.5 text-center font-medium text-gray-700">{tech.workDays || 0} วัน</td>
                         <td className="p-2.5 text-right font-extrabold text-emerald-600">

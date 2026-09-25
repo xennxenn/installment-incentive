@@ -573,7 +573,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
 
                           <div>
                             <label className="text-[10px] font-bold text-gray-700 block mb-0.5">
-                              2. ชื่อจริง (ชื่อเล่น) นามสกุล:
+                              2. ชื่อ-นามสกุล:
                             </label>
                             <input
                               className="w-full border rounded-lg p-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-400 font-medium"
@@ -903,7 +903,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
 
                 <div>
                   <label className="text-[10px] font-bold text-gray-600 block mb-0.5">
-                    2. ชื่อจริง (ชื่อเล่น) นามสกุล:
+                    2. ชื่อ-นามสกุล:
                   </label>
                   <input
                     placeholder="เช่น สมชาย (นาย) ใจกล้า (ใช้แสดงในหน้ารายงาน)"

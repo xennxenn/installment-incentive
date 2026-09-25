@@ -385,11 +385,11 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
                     <thead className="bg-gray-100/70 text-gray-600 font-semibold border-b sticky top-0">
                       <tr>
                         <th className="p-2.5 text-left w-20">รหัส</th>
-                        <th className="p-2.5 text-left">ชื่อจริง (ชื่อเล่น) นามสกุล</th>
-                        <th className="p-2.5 text-left">สังกัดทีม</th>
-                        <th className="p-2.5 text-center">วันที่เข้าทำงาน</th>
-                        <th className="p-2.5 text-center">วันทำงานในรอบ</th>
-                        <th className="p-2.5 text-right">Incentive สะสม</th>
+                        <th className="p-2.5 text-left whitespace-nowrap">ชื่อ-นามสกุล</th>
+                        <th className="p-2.5 text-left whitespace-nowrap">สังกัดทีม</th>
+                        <th className="p-2.5 text-center whitespace-nowrap">วันที่เข้าทำงาน</th>
+                        <th className="p-2.5 text-center whitespace-nowrap">วันทำงานในรอบ</th>
+                        <th className="p-2.5 text-right whitespace-nowrap">Incentive สะสม</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -406,8 +406,8 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
                         })
                         .map(tech => (
                           <tr key={tech.id} className="hover:bg-gray-50">
-                            <td className="p-2.5 font-mono text-[11px] text-gray-500 font-bold">{tech.employeeId || '-'}</td>
-                            <td className="p-2.5 font-bold text-gray-800">{tech?.fullName || tech?.name || ''}</td>
+                            <td className="p-2.5 font-mono text-[11px] text-gray-500 font-bold whitespace-nowrap">{tech.employeeId || '-'}</td>
+                            <td className="p-2.5 font-bold text-gray-800 whitespace-nowrap">{tech?.fullName || tech?.name || ''}</td>
                             <td className="p-2.5 font-medium text-gray-600">{tech.teamName}</td>
                             <td className="p-2.5 text-center text-gray-500">{formatDateTH(tech.joinDate) || '-'}</td>
                             <td className="p-2.5 text-center font-bold text-gray-700">{tech.workDays} วัน</td>
@@ -534,9 +534,9 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
                     <thead className="bg-gray-100/70 text-gray-600 font-semibold border-b">
                       <tr>
                         <th className="p-2.5 text-left w-20">รหัส</th>
-                        <th className="p-2.5 text-left">ชื่อจริง (ชื่อเล่น) นามสกุล</th>
-                        <th className="p-2.5 text-center">ประเภทการลา</th>
-                        <th className="p-2.5 text-left">วันที่ลา</th>
+                        <th className="p-2.5 text-left whitespace-nowrap">ชื่อ-นามสกุล</th>
+                        <th className="p-2.5 text-center whitespace-nowrap">ประเภทการลา</th>
+                        <th className="p-2.5 text-left whitespace-nowrap">วันที่ลา</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -550,8 +550,8 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
 
                           return (
                             <tr key={idx} className="hover:bg-gray-50">
-                              <td className="p-2.5 font-mono text-[11px] text-gray-500 font-bold">{empId}</td>
-                              <td className="p-2.5 font-bold text-gray-800">{techName}</td>
+                              <td className="p-2.5 font-mono text-[11px] text-gray-500 font-bold whitespace-nowrap">{empId}</td>
+                              <td className="p-2.5 font-bold text-gray-800 whitespace-nowrap">{techName}</td>
                               <td className="p-2.5 text-center">
                                 <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded border border-amber-200 font-semibold text-[10px]">
                                   {LEAVE_TYPES.find(l => l.id === leave.type)?.label || leave.type}

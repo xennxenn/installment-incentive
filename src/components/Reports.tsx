@@ -560,14 +560,14 @@ export const Reports: React.FC<ReportsProps> = ({
                       </div>
                     </th>
                   </tr>
-                  <tr className="text-gray-900 font-bold border-b border-gray-400 table-column-header bg-transparent">
-                    <th className="border border-gray-300 py-1.5 px-2 text-center w-10 bg-transparent">ลำดับ</th>
-                    <th className="border border-gray-300 py-1.5 px-2 text-center w-24 bg-transparent">รหัสพนักงาน</th>
-                    <th className="border border-gray-300 py-1.5 px-2 text-left bg-transparent">ชื่อจริง (ชื่อเล่น) นามสกุล</th>
-                    <th className="border border-gray-300 py-1.5 px-2 text-left w-36 bg-transparent">สังกัดทีม</th>
-                    <th className="border border-gray-300 py-1.5 px-2 text-center w-28 bg-transparent">วันทำงานจริง</th>
-                    <th className="border border-gray-300 py-1.5 px-2 text-right w-36 bg-transparent">ยอดรับสุทธิ (บาท)</th>
-                    <th className="border border-gray-300 py-1.5 px-2 text-right w-24 bg-transparent">สัดส่วน (%)</th>
+                  <tr className="text-gray-900 font-bold border-b border-gray-400 table-column-header bg-transparent text-[11px] md:text-xs">
+                    <th className="border border-gray-300 py-1.5 px-2 text-center w-10 whitespace-nowrap bg-transparent">ลำดับ</th>
+                    <th className="border border-gray-300 py-1.5 px-2 text-center w-20 whitespace-nowrap bg-transparent">รหัสพนักงาน</th>
+                    <th className="border border-gray-300 py-1.5 px-2 text-left whitespace-nowrap bg-transparent">ชื่อ-นามสกุล</th>
+                    <th className="border border-gray-300 py-1.5 px-2 text-left w-28 whitespace-nowrap bg-transparent">สังกัดทีม</th>
+                    <th className="border border-gray-300 py-1.5 px-2 text-center w-24 whitespace-nowrap bg-transparent">วันทำงานจริง</th>
+                    <th className="border border-gray-300 py-1.5 px-2 text-right w-28 whitespace-nowrap bg-transparent">ยอดรับสุทธิ (บาท)</th>
+                    <th className="border border-gray-300 py-1.5 px-2 text-right w-20 whitespace-nowrap bg-transparent">สัดส่วน (%)</th>
                   </tr>
                 </thead>
                 <tbody className="bg-transparent">
@@ -576,14 +576,16 @@ export const Reports: React.FC<ReportsProps> = ({
                       ? ((tech.incentive / calcData.totalIncentive) * 100).toFixed(1)
                       : '0.0';
                     return (
-                      <tr key={tech.id} className="bg-transparent">
-                        <td className="border border-gray-300 py-1.5 px-2 text-center text-gray-600 font-medium bg-transparent">{idx + 1}</td>
-                        <td className="border border-gray-300 py-1.5 px-2 text-center font-mono text-gray-700 bg-transparent">{tech.employeeId || '-'}</td>
-                        <td className="border border-gray-300 py-1.5 px-2 font-bold text-gray-900 bg-transparent">{getTechOfficialName(tech)}</td>
-                        <td className="border border-gray-300 py-1.5 px-2 text-gray-700 font-medium bg-transparent">{tech.teamName}</td>
-                        <td className="border border-gray-300 py-1.5 px-2 text-center font-semibold text-gray-800 bg-transparent">{tech.workDays || 0} วัน</td>
-                        <td className="border border-gray-300 py-1.5 px-2 text-right font-black text-emerald-800 bg-transparent">฿{Math.round(tech.incentive || 0).toLocaleString()}</td>
-                        <td className="border border-gray-300 py-1.5 px-2 text-right font-semibold text-gray-700 bg-transparent">{percentage}%</td>
+                      <tr key={tech.id} className="bg-transparent text-[11px] md:text-xs">
+                        <td className="border border-gray-300 py-1.5 px-2 text-center text-gray-600 font-medium bg-transparent whitespace-nowrap">{idx + 1}</td>
+                        <td className="border border-gray-300 py-1.5 px-2 text-center font-mono text-gray-700 bg-transparent whitespace-nowrap">{tech.employeeId || '-'}</td>
+                        <td className="border border-gray-300 py-1.5 px-2 font-bold text-gray-900 bg-transparent whitespace-nowrap">
+                          {getTechOfficialName(tech)}
+                        </td>
+                        <td className="border border-gray-300 py-1.5 px-2 text-gray-700 font-medium bg-transparent whitespace-nowrap">{tech.teamName}</td>
+                        <td className="border border-gray-300 py-1.5 px-2 text-center font-semibold text-gray-800 bg-transparent whitespace-nowrap">{tech.workDays || 0} วัน</td>
+                        <td className="border border-gray-300 py-1.5 px-2 text-right font-black text-emerald-800 bg-transparent whitespace-nowrap">฿{Math.round(tech.incentive || 0).toLocaleString()}</td>
+                        <td className="border border-gray-300 py-1.5 px-2 text-right font-semibold text-gray-700 bg-transparent whitespace-nowrap">{percentage}%</td>
                       </tr>
                     );
                   })}
@@ -1185,14 +1187,14 @@ export const Reports: React.FC<ReportsProps> = ({
                   )}
 
                   {jobTypeViewSubtab === 'by_tech' && (
-                    <tr className="text-gray-900 font-bold border-b border-gray-400 table-column-header bg-transparent">
-                      <th className="border border-gray-300 py-1.5 px-2 text-center w-10 bg-transparent">ลำดับ</th>
-                      <th className="border border-gray-300 py-1.5 px-2 text-center w-24 bg-transparent">รหัสพนักงาน</th>
-                      <th className="border border-gray-300 py-1.5 px-2 text-left w-48 bg-transparent">ชื่อจริง (ชื่อเล่น) นามสกุล</th>
-                      <th className="border border-gray-300 py-1.5 px-2 text-left w-28 bg-transparent">สังกัดทีม</th>
+                    <tr className="text-gray-900 font-bold border-b border-gray-400 table-column-header bg-transparent text-[11px] md:text-xs">
+                      <th className="border border-gray-300 py-1.5 px-2 text-center w-10 whitespace-nowrap bg-transparent">ลำดับ</th>
+                      <th className="border border-gray-300 py-1.5 px-2 text-center w-20 whitespace-nowrap bg-transparent">รหัสพนักงาน</th>
+                      <th className="border border-gray-300 py-1.5 px-2 text-left whitespace-nowrap bg-transparent">ชื่อ-นามสกุล</th>
+                      <th className="border border-gray-300 py-1.5 px-2 text-left w-28 whitespace-nowrap bg-transparent">สังกัดทีม</th>
                       <th className="border border-gray-300 py-1.5 px-2 text-left bg-transparent">ประเภทงาน</th>
-                      <th className="border border-gray-300 py-1.5 px-2 text-center w-20 bg-transparent">จำนวนงาน</th>
-                      <th className="border border-gray-300 py-1.5 px-2 text-right w-32 bg-transparent">Incentive ที่ได้ (บาท)</th>
+                      <th className="border border-gray-300 py-1.5 px-2 text-center w-20 whitespace-nowrap bg-transparent">จำนวนงาน</th>
+                      <th className="border border-gray-300 py-1.5 px-2 text-right w-28 whitespace-nowrap bg-transparent">Incentive ที่ได้ (บาท)</th>
                     </tr>
                   )}
                 </thead>
@@ -1317,7 +1319,7 @@ export const Reports: React.FC<ReportsProps> = ({
                             {bIdx === 0 && (
                               <td
                                 rowSpan={techStat.breakdown.length}
-                                className="border border-gray-300 py-1.5 px-2 font-bold text-gray-900 align-top bg-transparent"
+                                className="border border-gray-300 py-1.5 px-2 font-bold text-gray-900 align-top bg-transparent whitespace-nowrap"
                               >
                                 {getTechOfficialName(techStat)}
                               </td>

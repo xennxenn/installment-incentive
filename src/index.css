@@ -100,11 +100,19 @@
   .report-table th, 
   .report-table td {
     border: 1px solid #94a3b8 !important;
-    padding: 3.5px 5px !important;
+    padding: 3px 5px !important;
     font-size: 8pt !important;
     line-height: 1.2 !important;
     color: #0f172a !important;
     background-color: transparent !important;
+  }
+
+  /* Ensure names and critical cells stay strictly on 1 line when printed */
+  .report-table th.whitespace-nowrap,
+  .report-table td.whitespace-nowrap,
+  .report-table .whitespace-nowrap {
+    white-space: nowrap !important;
+    word-break: keep-all !important;
   }
 
   .print-header-row,
