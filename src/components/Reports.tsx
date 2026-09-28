@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Printer, Users, User, Layers, LayoutDashboard, FileSpreadsheet, ClipboardList, CheckSquare, AlertCircle, Coins, Award } from 'lucide-react';
-import { Team, PayPeriod, OtherIncomeRecord } from '../types';
+import { Team, PayPeriod, OtherIncomeRecord, LeaveRecord } from '../types';
 import { CalculationResult, formatDateTH, getTechOfficialName, isMemberActiveInPeriod } from '../utils/calculator';
 import { getAllowancePeriodMatchingCurtainPeriod } from '../utils/periodUtils';
 import { LOGO_URL } from '../data/initialData';
@@ -10,15 +10,27 @@ interface ReportsProps {
   calcData: CalculationResult;
   period: PayPeriod;
   otherIncomes?: OtherIncomeRecord[];
+  leaves?: LeaveRecord[];
   themeColor: string;
   themeTextColor: string;
 }
+
+const getLeaveTypeLabel = (type?: string) => {
+  switch (type) {
+    case 'sick': return 'ลาป่วย';
+    case 'business': return 'ลากิจ';
+    case 'vacation': return 'ลาพักร้อน';
+    case 'other': return 'ลาอื่นๆ';
+    default: return type || 'ลา';
+  }
+};
 
 export const Reports: React.FC<ReportsProps> = ({
   teams,
   calcData,
   period,
   otherIncomes = [],
+  leaves = [],
   themeColor,
   themeTextColor
 }) => {
@@ -1693,7 +1705,28 @@ export const Reports: React.FC<ReportsProps> = ({
             const otherCount = otherRecords.length;
 
             const totalComp = curtainInc + acInc + allowanceInc + otherInc;
-            const workDays = calcData.individualStats.find(s => s.id === tech.id)?.workDays || 0;
+            const individualStat = calcData.individualStats.find(s => s.id === tech.id);
+            const workDays = individualStat?.workDays || 0;
+
+            // Compute technician's leaves in this pay period
+            const techLeaves: Array<{ date: string; type: string; note?: string }> = (leaves && leaves.length > 0)
+              ? leaves
+                  .filter(l => l.techId === tech.id && l.date >= period.start && l.date <= period.end)
+                  .map(l => ({ date: l.date, type: l.type, note: l.note }))
+              : (individualStat?.leaves || []);
+
+            const leaveCount = techLeaves.length;
+            const sickCount = techLeaves.filter(l => l.type === 'sick').length;
+            const businessCount = techLeaves.filter(l => l.type === 'business').length;
+            const vacationCount = techLeaves.filter(l => l.type === 'vacation').length;
+            const otherLeaveCount = techLeaves.filter(l => l.type !== 'sick' && l.type !== 'business' && l.type !== 'vacation').length;
+
+            const leaveParts: string[] = [];
+            if (sickCount > 0) leaveParts.push(`ป่วย ${sickCount}`);
+            if (businessCount > 0) leaveParts.push(`กิจ ${businessCount}`);
+            if (vacationCount > 0) leaveParts.push(`พักร้อน ${vacationCount}`);
+            if (otherLeaveCount > 0) leaveParts.push(`อื่นๆ ${otherLeaveCount}`);
+            const leaveSummaryText = leaveParts.length > 0 ? `(${leaveParts.join(', ')})` : '';
 
             return {
               tech,
@@ -1710,7 +1743,10 @@ export const Reports: React.FC<ReportsProps> = ({
               otherInc,
               otherCount,
               totalComp,
-              workDays
+              workDays,
+              leaves: techLeaves,
+              leaveCount,
+              leaveSummaryText
             };
           });
 
@@ -1839,15 +1875,18 @@ export const Reports: React.FC<ReportsProps> = ({
                               </tbody>
                             </table>
 
-                            <div className="text-center mt-2 space-y-0.5">
+                            <div className="text-center mt-2 space-y-1">
                               <h1 className="font-black text-base text-gray-900 tracking-tight leading-tight">
                                 เอกสารใบแจ้งค่าตอบแทนรวมรายบุคคล (INDIVIDUAL TOTAL COMPENSATION SLIP)
                               </h1>
-                              <p className="text-xs font-semibold text-gray-700 leading-tight">
-                                รอบคำนวณผ้าม่าน: <span className="text-gray-900 font-bold">{period?.name || ''}</span> ({formatDateTH(period?.start || '')} ถึง {formatDateTH(period?.end || '')})
-                                <span className="mx-2 text-gray-400">|</span>
-                                รอบคำนวณเบี้ยเลี้ยง (21-20): <span className="text-amber-900 font-bold">{matchingAllowancePeriod.name}</span> ({formatDateTH(matchingAllowancePeriod.start)} ถึง {formatDateTH(matchingAllowancePeriod.end)})
-                              </p>
+                              <div className="text-xs font-semibold text-gray-700 space-y-0.5 leading-tight">
+                                <p>
+                                  รอบคำนวณผ้าม่าน: <span className="text-gray-900 font-bold">{period?.name || ''}</span> ({formatDateTH(period?.start || '')} ถึง {formatDateTH(period?.end || '')})
+                                </p>
+                                <p>
+                                  รอบคำนวณเบี้ยเลี้ยง (21-20): <span className="text-amber-900 font-bold">{matchingAllowancePeriod.name}</span> ({formatDateTH(matchingAllowancePeriod.start)} ถึง {formatDateTH(matchingAllowancePeriod.end)})
+                                </p>
+                              </div>
                             </div>
                           </div>
 
@@ -1855,7 +1894,7 @@ export const Reports: React.FC<ReportsProps> = ({
                           <table className="w-full border border-gray-400 rounded-sm border-collapse text-xs mb-3 bg-transparent print-bordered-box">
                             <tbody>
                               <tr>
-                                <td className="border-r border-gray-400 p-2 text-left w-1/3 align-middle bg-transparent">
+                                <td className="border-r border-gray-400 p-2 text-left w-1/4 align-middle bg-transparent">
                                   {currentTechData.tech.employeeId && (
                                     <span className="text-[10px] font-mono text-gray-500 block leading-tight">
                                       รหัสพนักงาน: <strong>{currentTechData.tech.employeeId}</strong>
@@ -1869,18 +1908,27 @@ export const Reports: React.FC<ReportsProps> = ({
                                     (สังกัดทีม: {currentTechData.tech.teamName})
                                   </span>
                                 </td>
-                                <td className="border-r border-gray-400 p-2 text-center w-1/3 align-middle bg-transparent">
+                                <td className="border-r border-gray-400 p-2 text-center w-1/4 align-middle bg-transparent">
                                   <span className="text-gray-600 block text-[10.5px] leading-snug">วันปฏิบัติงานผ้าม่าน:</span>
                                   <strong className="text-xs md:text-sm text-gray-900 font-bold block leading-snug">
                                     {currentTechData.workDays} วัน
                                   </strong>
                                   {currentTechData.allowanceCount > 0 && (
-                                    <span className="text-[10.5px] text-amber-800 font-semibold block leading-snug">
+                                    <span className="text-[10px] text-amber-800 font-semibold block leading-snug">
                                       (เบี้ยเลี้ยง: {currentTechData.allowanceCount} วัน)
                                     </span>
                                   )}
                                 </td>
-                                <td className="p-2 text-right w-1/3 align-middle bg-transparent">
+                                <td className="border-r border-gray-400 p-2 text-center w-1/4 align-middle bg-transparent">
+                                  <span className="text-gray-600 block text-[10.5px] leading-snug">วันลาในรอบคำนวณ:</span>
+                                  <strong className={`text-xs md:text-sm font-bold block leading-snug ${currentTechData.leaveCount > 0 ? 'text-amber-900' : 'text-gray-800'}`}>
+                                    {currentTechData.leaveCount} วัน
+                                  </strong>
+                                  <span className="text-[10px] text-gray-600 block leading-snug">
+                                    {currentTechData.leaveCount > 0 ? currentTechData.leaveSummaryText : '(ไม่มีประวัติวันลา)'}
+                                  </span>
+                                </td>
+                                <td className="p-2 text-right w-1/4 align-middle bg-transparent">
                                   <span className="text-gray-600 block text-[10.5px] leading-snug">รวมค่าตอบแทนสุทธิทั้งสิ้น:</span>
                                   <strong className="text-sm md:text-base text-emerald-800 font-black block leading-snug">
                                     ฿{Math.round(currentTechData.totalComp).toLocaleString()}
@@ -1945,6 +1993,29 @@ export const Reports: React.FC<ReportsProps> = ({
                       </tr>
                     </tfoot>
                   </table>
+
+                  {/* Leave Records Breakdown (วันลาของพนักงาน) */}
+                  {currentTechData.leaves.length > 0 ? (
+                    <div className="mt-3 p-2.5 bg-amber-50/60 border border-amber-200 rounded-sm text-xs print:border-gray-400 print:bg-transparent">
+                      <div className="font-bold text-gray-900 mb-1 flex items-center gap-1.5">
+                        <span className="text-amber-900 font-bold">บันทึกวันลาในรอบคำนวณ (รวม {currentTechData.leaveCount} วัน):</span>
+                        <span className="text-[10.5px] text-gray-600 font-normal">{currentTechData.leaveSummaryText}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 pt-0.5">
+                        {currentTechData.leaves.map((l: any, i: number) => (
+                          <span key={i} className="inline-flex items-center gap-1 bg-white border border-gray-300 px-2 py-0.5 rounded text-[11px] text-gray-800 print:border-gray-400">
+                            <span className="font-semibold text-gray-700">{formatDateTH(l.date)}:</span>
+                            <span className="font-bold text-amber-900">{getLeaveTypeLabel(l.type)}</span>
+                            {l.note && <span className="text-gray-500 text-[10px]">({l.note})</span>}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-[10.5px] text-gray-500 italic bg-transparent">
+                      * บันทึกวันลา: ไม่มีประวัติการลาในรอบคำนวณนี้ (ปฏิบัติงานครบตามกำหนด)
+                    </div>
+                  )}
 
                   {/* Official Sign-off Approval Block */}
                   <div className="mt-6 pt-3 border-t border-gray-300 text-xs text-gray-800 print-signature-block">
@@ -2028,15 +2099,18 @@ export const Reports: React.FC<ReportsProps> = ({
                               </tbody>
                             </table>
 
-                            <div className="text-center mt-2 space-y-0.5">
+                            <div className="text-center mt-2 space-y-1">
                               <h1 className="font-black text-base text-gray-900 tracking-tight leading-tight">
                                 ตารางสรุปค่าตอบแทนรวมรายบุคคล (TOTAL INDIVIDUAL COMPENSATION SUMMARY)
                               </h1>
-                              <p className="text-xs font-semibold text-gray-700 leading-tight">
-                                รอบคำนวณผ้าม่าน: <span className="text-gray-900 font-bold">{period?.name || ''}</span> ({formatDateTH(period?.start || '')} ถึง {formatDateTH(period?.end || '')})
-                                <span className="mx-2 text-gray-400">|</span>
-                                รอบคำนวณเบี้ยเลี้ยง (21-20): <span className="text-amber-900 font-bold">{matchingAllowancePeriod.name}</span> ({formatDateTH(matchingAllowancePeriod.start)} ถึง {formatDateTH(matchingAllowancePeriod.end)})
-                              </p>
+                              <div className="text-xs font-semibold text-gray-700 space-y-0.5 leading-tight">
+                                <p>
+                                  รอบคำนวณผ้าม่าน: <span className="text-gray-900 font-bold">{period?.name || ''}</span> ({formatDateTH(period?.start || '')} ถึง {formatDateTH(period?.end || '')})
+                                </p>
+                                <p>
+                                  รอบคำนวณเบี้ยเลี้ยง (21-20): <span className="text-amber-900 font-bold">{matchingAllowancePeriod.name}</span> ({formatDateTH(matchingAllowancePeriod.start)} ถึง {formatDateTH(matchingAllowancePeriod.end)})
+                                </p>
+                              </div>
                             </div>
                           </div>
                         </th>
@@ -2047,6 +2121,7 @@ export const Reports: React.FC<ReportsProps> = ({
                         <th className="border border-gray-300 py-1.5 px-2 text-center w-20 whitespace-nowrap bg-transparent">รหัสพนักงาน</th>
                         <th className="border border-gray-300 py-1.5 px-2 text-left whitespace-nowrap bg-transparent">ชื่อ-นามสกุล</th>
                         <th className="border border-gray-300 py-1.5 px-2 text-left w-28 whitespace-nowrap bg-transparent">สังกัดทีม</th>
+                        <th className="border border-gray-300 py-1.5 px-2 text-center w-24 whitespace-nowrap bg-transparent">วันลา (วัน)</th>
                         <th className="border border-gray-300 py-1.5 px-2 text-right w-28 whitespace-nowrap bg-transparent">ค่าผ้าม่าน (บาท)</th>
                         <th className="border border-gray-300 py-1.5 px-2 text-right w-28 whitespace-nowrap bg-transparent">ค่าเบี้ยเลี้ยง (21-20)</th>
                         <th className="border border-gray-300 py-1.5 px-2 text-right w-28 whitespace-nowrap bg-transparent">ค่าติดตั้งแอร์ (บาท)</th>
@@ -2069,6 +2144,15 @@ export const Reports: React.FC<ReportsProps> = ({
                           </td>
                           <td className="border border-gray-300 py-1.5 px-2 text-gray-700 font-medium bg-transparent whitespace-nowrap">
                             {item.tech.teamName}
+                          </td>
+                          <td className="border border-gray-300 py-1.5 px-2 text-center bg-transparent whitespace-nowrap">
+                            {item.leaveCount > 0 ? (
+                              <span className="font-bold text-amber-900">
+                                {item.leaveCount} วัน {item.leaveSummaryText && <span className="text-[10px] text-gray-600 block">{item.leaveSummaryText}</span>}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">0 วัน</span>
+                            )}
                           </td>
                           <td className="border border-gray-300 py-1.5 px-2 text-right font-semibold text-gray-900 bg-transparent whitespace-nowrap">
                             ฿{Math.round(item.curtainInc).toLocaleString()}
@@ -2101,8 +2185,8 @@ export const Reports: React.FC<ReportsProps> = ({
                     </tbody>
                     <tfoot className="font-bold border-t-2 border-gray-400 bg-transparent">
                       <tr>
-                        <td colSpan={4} className="border border-gray-300 py-2 px-2 text-right font-black text-gray-900 bg-transparent">
-                          รวมค่าตอบแทนพนักงานทั้งหมด ({allTechCompensationList.length} คน):
+                        <td colSpan={5} className="border border-gray-300 py-2 px-2 text-right font-black text-gray-900 bg-transparent">
+                          รวมค่าตอบแทนพนักงานทั้งหมด ({allTechCompensationList.length} คน | วันลารวม {allTechCompensationList.reduce((s, i) => s + i.leaveCount, 0)} วัน):
                         </td>
                         <td className="border border-gray-300 py-2 px-2 text-right text-gray-900 font-black bg-transparent">
                           ฿{Math.round(allTechCompensationList.reduce((s, i) => s + i.curtainInc, 0)).toLocaleString()}

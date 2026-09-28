@@ -2028,6 +2028,7 @@ export default function App() {
             calcData={calcData}
             period={safePeriod}
             otherIncomes={otherIncomes}
+            leaves={leaves}
             themeColor={themeColor}
             themeTextColor={themeTextColor}
           />
