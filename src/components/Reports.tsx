@@ -1884,7 +1884,7 @@ export const Reports: React.FC<ReportsProps> = ({
                                   รอบคำนวณผ้าม่าน: <span className="text-gray-900 font-bold">{period?.name || ''}</span> ({formatDateTH(period?.start || '')} ถึง {formatDateTH(period?.end || '')})
                                 </p>
                                 <p>
-                                  รอบคำนวณเบี้ยเลี้ยง (21-20): <span className="text-amber-900 font-bold">{matchingAllowancePeriod.name}</span> ({formatDateTH(matchingAllowancePeriod.start)} ถึง {formatDateTH(matchingAllowancePeriod.end)})
+                                  รอบคำนวณเบี้ยเลี้ยง (21-20): <span className="text-gray-900 font-bold">{matchingAllowancePeriod.name}</span> ({formatDateTH(matchingAllowancePeriod.start)} ถึง {formatDateTH(matchingAllowancePeriod.end)})
                                 </p>
                               </div>
                             </div>
@@ -1914,14 +1914,14 @@ export const Reports: React.FC<ReportsProps> = ({
                                     {currentTechData.workDays} วัน
                                   </strong>
                                   {currentTechData.allowanceCount > 0 && (
-                                    <span className="text-[10px] text-amber-800 font-semibold block leading-snug">
+                                    <span className="text-[10px] text-gray-700 font-semibold block leading-snug">
                                       (เบี้ยเลี้ยง: {currentTechData.allowanceCount} วัน)
                                     </span>
                                   )}
                                 </td>
                                 <td className="border-r border-gray-400 p-2 text-center w-1/4 align-middle bg-transparent">
                                   <span className="text-gray-600 block text-[10.5px] leading-snug">วันลาในรอบคำนวณ:</span>
-                                  <strong className={`text-xs md:text-sm font-bold block leading-snug ${currentTechData.leaveCount > 0 ? 'text-amber-900' : 'text-gray-800'}`}>
+                                  <strong className="text-xs md:text-sm font-bold block leading-snug text-gray-900">
                                     {currentTechData.leaveCount} วัน
                                   </strong>
                                   <span className="text-[10px] text-gray-600 block leading-snug">
@@ -1995,27 +1995,37 @@ export const Reports: React.FC<ReportsProps> = ({
                   </table>
 
                   {/* Leave Records Breakdown (วันลาของพนักงาน) */}
-                  {currentTechData.leaves.length > 0 ? (
-                    <div className="mt-3 p-2.5 bg-amber-50/60 border border-amber-200 rounded-sm text-xs print:border-gray-400 print:bg-transparent">
-                      <div className="font-bold text-gray-900 mb-1 flex items-center gap-1.5">
-                        <span className="text-amber-900 font-bold">บันทึกวันลาในรอบคำนวณ (รวม {currentTechData.leaveCount} วัน):</span>
-                        <span className="text-[10.5px] text-gray-600 font-normal">{currentTechData.leaveSummaryText}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2 pt-0.5">
+                  <div className="mt-3 p-2.5 border border-gray-400 rounded-sm text-xs bg-transparent print-bordered-box">
+                    <div className="font-bold text-gray-900 mb-1 flex items-center gap-1.5">
+                      <span className="text-gray-900 font-bold">บันทึกวันลาในรอบคำนวณ:</span>
+                      {currentTechData.leaveCount > 0 ? (
+                        <>
+                          <span className="font-bold text-gray-900">(รวม {currentTechData.leaveCount} วัน)</span>
+                          {currentTechData.leaveSummaryText && (
+                            <span className="text-[10.5px] text-gray-600 font-normal">
+                              - {currentTechData.leaveSummaryText}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-[10.5px] text-gray-500 font-normal italic">
+                          ไม่มีประวัติการลาในรอบคำนวณนี้ (ปฏิบัติงานครบตามกำหนด)
+                        </span>
+                      )}
+                    </div>
+                    {currentTechData.leaves.length > 0 && (
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5 text-[11px] md:text-xs text-gray-800">
                         {currentTechData.leaves.map((l: any, i: number) => (
-                          <span key={i} className="inline-flex items-center gap-1 bg-white border border-gray-300 px-2 py-0.5 rounded text-[11px] text-gray-800 print:border-gray-400">
-                            <span className="font-semibold text-gray-700">{formatDateTH(l.date)}:</span>
-                            <span className="font-bold text-amber-900">{getLeaveTypeLabel(l.type)}</span>
+                          <span key={i} className="inline-flex items-center gap-1 bg-transparent">
+                            <span className="font-medium text-gray-700">{formatDateTH(l.date)}:</span>
+                            <span className="font-bold text-gray-900">{getLeaveTypeLabel(l.type)}</span>
                             {l.note && <span className="text-gray-500 text-[10px]">({l.note})</span>}
+                            {i < currentTechData.leaves.length - 1 && <span className="text-gray-400 ml-1">,</span>}
                           </span>
                         ))}
                       </div>
-                    </div>
-                  ) : (
-                    <div className="mt-2 text-[10.5px] text-gray-500 italic bg-transparent">
-                      * บันทึกวันลา: ไม่มีประวัติการลาในรอบคำนวณนี้ (ปฏิบัติงานครบตามกำหนด)
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* Official Sign-off Approval Block */}
                   <div className="mt-6 pt-3 border-t border-gray-300 text-xs text-gray-800 print-signature-block">
@@ -2108,7 +2118,7 @@ export const Reports: React.FC<ReportsProps> = ({
                                   รอบคำนวณผ้าม่าน: <span className="text-gray-900 font-bold">{period?.name || ''}</span> ({formatDateTH(period?.start || '')} ถึง {formatDateTH(period?.end || '')})
                                 </p>
                                 <p>
-                                  รอบคำนวณเบี้ยเลี้ยง (21-20): <span className="text-amber-900 font-bold">{matchingAllowancePeriod.name}</span> ({formatDateTH(matchingAllowancePeriod.start)} ถึง {formatDateTH(matchingAllowancePeriod.end)})
+                                  รอบคำนวณเบี้ยเลี้ยง (21-20): <span className="text-gray-900 font-bold">{matchingAllowancePeriod.name}</span> ({formatDateTH(matchingAllowancePeriod.start)} ถึง {formatDateTH(matchingAllowancePeriod.end)})
                                 </p>
                               </div>
                             </div>
@@ -2147,7 +2157,7 @@ export const Reports: React.FC<ReportsProps> = ({
                           </td>
                           <td className="border border-gray-300 py-1.5 px-2 text-center bg-transparent whitespace-nowrap">
                             {item.leaveCount > 0 ? (
-                              <span className="font-bold text-amber-900">
+                              <span className="font-bold text-gray-900">
                                 {item.leaveCount} วัน {item.leaveSummaryText && <span className="text-[10px] text-gray-600 block">{item.leaveSummaryText}</span>}
                               </span>
                             ) : (
@@ -2157,7 +2167,7 @@ export const Reports: React.FC<ReportsProps> = ({
                           <td className="border border-gray-300 py-1.5 px-2 text-right font-semibold text-gray-900 bg-transparent whitespace-nowrap">
                             ฿{Math.round(item.curtainInc).toLocaleString()}
                           </td>
-                          <td className="border border-gray-300 py-1.5 px-2 text-right font-semibold text-amber-900 bg-transparent whitespace-nowrap">
+                          <td className="border border-gray-300 py-1.5 px-2 text-right font-semibold text-gray-900 bg-transparent whitespace-nowrap">
                             {item.allowanceInc > 0 ? `฿${Math.round(item.allowanceInc).toLocaleString()} (${item.allowanceCount}ว)` : '-'}
                           </td>
                           <td className="border border-gray-300 py-1.5 px-2 text-right font-semibold text-blue-900 bg-transparent whitespace-nowrap">
@@ -2175,7 +2185,7 @@ export const Reports: React.FC<ReportsProps> = ({
                                 setSelectedTotalCompTechId(item.tech.id);
                                 setTotalCompViewMode('slip');
                               }}
-                              className="px-2 py-0.5 text-[10.5px] font-bold text-amber-700 hover:text-amber-900 hover:bg-amber-50 rounded-lg transition-colors border border-amber-200 cursor-pointer"
+                              className="px-2 py-0.5 text-[10.5px] font-bold text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors border border-gray-300 cursor-pointer"
                             >
                               ดูสลิป
                             </button>
@@ -2191,7 +2201,7 @@ export const Reports: React.FC<ReportsProps> = ({
                         <td className="border border-gray-300 py-2 px-2 text-right text-gray-900 font-black bg-transparent">
                           ฿{Math.round(allTechCompensationList.reduce((s, i) => s + i.curtainInc, 0)).toLocaleString()}
                         </td>
-                        <td className="border border-gray-300 py-2 px-2 text-right text-amber-900 font-black bg-transparent">
+                        <td className="border border-gray-300 py-2 px-2 text-right text-gray-900 font-black bg-transparent">
                           ฿{Math.round(allTechCompensationList.reduce((s, i) => s + i.allowanceInc, 0)).toLocaleString()}
                         </td>
                         <td className="border border-gray-300 py-2 px-2 text-right text-blue-900 font-black bg-transparent">
